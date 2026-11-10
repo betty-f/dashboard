@@ -1,5 +1,5 @@
 // Hält die App-Dateien für den Offline-Start bereit. Daten von Google werden nie zwischengespeichert.
-const CACHE = 'dashboard-v2';
+const CACHE = 'dashboard-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -205,6 +205,11 @@ dialog h2{margin:0 0 14px;font-size:18px}
   .stat b{font-size:17px}
 }
 
+/* Kalenderwochen */
+.cal-grid{grid-template-columns:34px repeat(7,minmax(0,1fr))}
+.cal-kw{background:var(--surface-2);color:var(--muted);font-size:12px;font-weight:600;display:flex;justify-content:center;padding-top:10px;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.cal-grid{grid-template-columns:26px repeat(7,minmax(0,1fr))}.cal-kw{font-size:11px;padding-top:8px}}
+
 /* Kalender-Schalter */
 .toggles{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
 .gtog{position:relative;display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 9px;border:1px solid var(--line);border-radius:20px;background:var(--surface);font-size:13.5px;cursor:pointer;user-select:none}
@@ -399,6 +404,11 @@ const num2 = n => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, 
 const fmtDateTime = iso => iso ? new Date(iso).toLocaleString('de-DE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'noch nie';
 const fmtTime = iso => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 const monthName = ym => parseYmd(ym + '-01').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+const isoWeek = d => {           // Kalenderwoche nach DIN/ISO 8601
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
+};
 const count = (c, one, many) => `${c === 0 ? 'keine' : c} ${c === 1 ? one : many}`;
 
 function dueLabel(s) {
@@ -883,9 +893,10 @@ function renderCal() {
   const cells = Math.ceil((offset + new Date(y, m, 0).getDate()) / 7) * 7;
   const t = todayStr();
   $('#calTitle').textContent = monthName(ui.calMonth);
-  let h = ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => `<div class="cal-wd">${d}</div>`).join('');
+  let h = ['KW','Mo','Di','Mi','Do','Fr','Sa','So'].map(d => `<div class="cal-wd">${d}</div>`).join('');
   for (let i = 0; i < cells; i++) {
     const d = new Date(y, m - 1, 1 - offset + i), ds = ymd(d);
+    if (i % 7 === 0) h += `<div class="cal-kw" aria-label="Kalenderwoche ${isoWeek(d)}">${isoWeek(d)}</div>`;
     const all = [
       ...entriesOn(ds).map(e => e.kind === 'google'
         ? `<span class="ci g" style="--c:${esc(e.cal.color)}">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`
@@ -898,7 +909,7 @@ function renderCal() {
   }
   $('#calGrid').innerHTML = h;
 
-  $('#dayTitle').textContent = parseYmd(ui.calDay).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#dayTitle').textContent = parseYmd(ui.calDay).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ', KW ' + isoWeek(parseYmd(ui.calDay));
   const evs = entriesOn(ui.calDay), tds = todosOn(ui.calDay);
   let dl = '';
   if (evs.length) dl += `<ul class="mini">${evs.map(e => entryRow(e, e.time ? esc(e.time) : 'ganztägig')).join('')}</ul>`;
