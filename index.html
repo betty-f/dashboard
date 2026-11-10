@@ -468,35 +468,47 @@ function replaceData(d) {
 
 /* ---------- Google-Anmeldung ---------- */
 class AuthError extends Error { constructor() { super('Nicht mit Google verbunden'); this.name = 'AuthError'; } }
-const auth = Object.assign({ token: null, exp: 0 }, lsGet(LS_TOKEN, {}), { client: null, error: null });
+const auth = Object.assign({ token: null, exp: 0 }, lsGet(LS_TOKEN, {}), { error: null });
 const signedIn = () => !!auth.token && Date.now() < auth.exp;
+const REDIRECT_URI = location.origin + location.pathname.replace(/index\.html$/, '');
 
-function initGis() {
-  if (auth.client || !(window.google && google.accounts && google.accounts.oauth2)) return;
-  auth.client = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: SCOPE_CAL + ' ' + SCOPE_DRIVE,
-    callback: r => {
-      if (r.error) { auth.error = r.error_description || r.error; renderStatus(); return; }
-      auth.token = r.access_token;
-      auth.exp = Date.now() + (Number(r.expires_in || 3600) - 60) * 1000;
-      lsSet(LS_TOKEN, { token: auth.token, exp: auth.exp });
-      auth.error = null;
-      if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE_CAL, SCOPE_DRIVE))
-        toast('Bitte beim Anmelden beide Häkchen setzen: Kalender ansehen und Drive-Dateien des Dashboards.');
-      meta.consented = true; saveMeta();
-      onSignedIn();
-    },
-    error_callback: e => { auth.error = e.type === 'popup_closed' ? null : (e.message || e.type); renderStatus(); }
-  });
-}
+/* Anmeldung per Weiterleitung zu Google (zuverlässiger als ein Popup, auch in der installierten App) */
 function signIn() {
-  initGis();
-  if (!auth.client) { toast('Die Google-Anmeldung lädt noch. Bitte gleich noch einmal tippen.'); return; }
-  auth.client.requestAccessToken({ prompt: meta.consented ? '' : 'consent' });
+  const state = uid();
+  lsSet('dashboard.oauthState', state);
+  const p = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: 'token',
+    scope: SCOPE_CAL + ' ' + SCOPE_DRIVE, include_granted_scopes: 'true', state
+  });
+  if (!meta.consented) p.set('prompt', 'consent');
+  location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + p.toString());
+}
+/* Rückkehr von Google: Zugang aus der Adresse lesen und die Adresse wieder säubern */
+function handleRedirect() {
+  const hash = location.hash.slice(1);
+  if (!/(^|&)(access_token|error)=/.test(hash)) return false;
+  const h = new URLSearchParams(hash);
+  history.replaceState(null, '', location.pathname + location.search);
+  const expected = lsGet('dashboard.oauthState', null);
+  localStorage.removeItem('dashboard.oauthState');
+  if (!expected || h.get('state') !== expected) { auth.error = 'Die Antwort von Google passt nicht zur Anfrage. Bitte erneut verbinden.'; return false; }
+  if (h.get('error')) {
+    const err = h.get('error');
+    auth.error = err === 'access_denied' ? 'Zugriff wurde nicht erlaubt' : err;
+    return false;
+  }
+  auth.token = h.get('access_token');
+  auth.exp = Date.now() + (Number(h.get('expires_in') || 3600) - 60) * 1000;
+  lsSet(LS_TOKEN, { token: auth.token, exp: auth.exp });
+  auth.error = null;
+  const granted = (h.get('scope') || '').split(' ');
+  if (!granted.includes(SCOPE_CAL) || !granted.includes(SCOPE_DRIVE))
+    setTimeout(() => toast('Bitte beim Anmelden beide Häkchen setzen: Kalender ansehen und Drive-Dateien des Dashboards.'), 300);
+  meta.consented = true; saveMeta();
+  return true;
 }
 function signOut() {
-  if (auth.token && window.google) { try { google.accounts.oauth2.revoke(auth.token, () => {}); } catch {} }
+  if (auth.token) fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(auth.token), { method: 'POST', mode: 'no-cors' }).catch(() => {});
   auth.token = null; auth.exp = 0; lsSet(LS_TOKEN, {});
   meta.consented = false; saveMeta();
   render();
@@ -1137,11 +1149,10 @@ function toast(msg) {
 
 /* ---------- Start ---------- */
 $('#finForm').elements.namedItem('date').value = todayStr();
-render();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-if (signedIn()) { syncData().then(() => refreshCalendars(false)); }
-window.onGisLoad = () => initGis();
+handleRedirect();
+render();
+if (signedIn()) { syncData().then(() => refreshCalendars(true)); }
 </script>
-<script src="https://accounts.google.com/gsi/client" async onload="onGisLoad()"></script>
 </body>
 </html>
