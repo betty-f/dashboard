@@ -4,9 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#2E6E62">
 <title>Dashboard</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8B%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
+
 :root{
   color-scheme: light;
   --bg:#EEF1EC; --surface:#FFFFFF; --surface-2:#E3E8E1; --ink:#1D2433; --muted:#5E6676; --line:#D3D9D0;
@@ -130,20 +134,6 @@ ul.todos{list-style:none;margin:0;padding:0;background:var(--surface);border:1px
 .ci.td{box-shadow:inset 0 0 0 1px var(--line);color:var(--muted)}
 .ci.more{color:var(--muted);padding-left:2px}
 .day-panel{margin-top:16px}
-.gcal-bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
-.gcal-toggles{display:flex;flex-wrap:wrap;gap:6px}
-.gtog{position:relative;display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 9px;border:1px solid var(--line);border-radius:20px;background:var(--surface);font-size:13.5px;cursor:pointer;user-select:none}
-.gtog input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
-.gtog .dot{width:12px;height:12px;border-radius:50%;flex:none}
-.gtog:has(input:not(:checked)){color:var(--muted);background:none;border-style:dashed}
-.gtog:has(input:not(:checked)) .dot{background:transparent !important;box-shadow:inset 0 0 0 2px var(--muted)}
-.gtog:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
-.gcal-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:8px;align-items:center;margin:8px 0}
-.gcal-row input[type=color]{width:44px;height:38px;padding:3px;cursor:pointer}
-.gcal-row .show{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;white-space:nowrap;cursor:pointer}
-.gcal-row .show input{width:auto;margin:0}
-#gcalInput{margin-top:8px}
-.gcal-wrap iframe{width:100%;height:min(75vh,720px);border:1px solid var(--line);border-radius:var(--radius);background:#fff;display:block}
 
 /* Finanzen */
 .fin-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
@@ -214,6 +204,28 @@ dialog h2{margin:0 0 14px;font-size:18px}
   .stat{padding:10px 12px}
   .stat b{font-size:17px}
 }
+
+/* Kalender-Schalter */
+.toggles{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.gtog{position:relative;display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 9px;border:1px solid var(--line);border-radius:20px;background:var(--surface);font-size:13.5px;cursor:pointer;user-select:none}
+.gtog input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.gtog .dot{width:12px;height:12px;border-radius:50%;flex:none;background:var(--c)}
+.gtog:has(input:not(:checked)){color:var(--muted);background:none;border-style:dashed}
+.gtog:has(input:not(:checked)) .dot{background:transparent;box-shadow:inset 0 0 0 2px var(--muted)}
+.gtog:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.cal-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ci.g{background:color-mix(in srgb,var(--c) 24%,var(--surface));box-shadow:inset 3px 0 0 var(--c);color:var(--ink)}
+.cdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:baseline;flex:none}
+.sub{display:block;font-size:12.5px;color:var(--muted)}
+.set-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.set-row:first-child{border-top:0}
+.set-row .name{flex:1;min-width:0;overflow-wrap:anywhere}
+.set-row label{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer}
+.set-row input{width:auto;margin:0}
+@media (max-width:640px){
+  .ci.g{background:var(--c);box-shadow:none}
+}
+
 </style>
 </head>
 <body>
@@ -274,25 +286,20 @@ dialog h2{margin:0 0 14px;font-size:18px}
       <section id="v-cal" class="view" hidden>
         <div class="view-head">
           <h1 class="view-title">Kalender</h1>
-          <div class="seg" id="calMode">
-            <button type="button" data-act="cal-mode" data-m="own">Mein Kalender</button>
-            <button type="button" data-act="cal-mode" data-m="google">Google Kalender</button>
-          </div>
+          <div class="cal-actions"><span id="calState" class="muted"></span><button class="btn small" data-act="cal-refresh">Aktualisieren</button></div>
         </div>
-        <div id="calOwn">
-          <div class="monthbar">
-            <button class="btn icon" data-act="cal-prev" aria-label="Voriger Monat">‹</button>
-            <h2 id="calTitle"></h2>
-            <button class="btn icon" data-act="cal-next" aria-label="Nächster Monat">›</button>
-            <button class="btn small" data-act="cal-today">Heute</button>
-          </div>
-          <div class="cal-grid" id="calGrid"></div>
-          <section class="panel day-panel">
-            <div class="panel-head"><h2 id="dayTitle"></h2><button class="btn small primary" data-act="event-new">Termin hinzufügen</button></div>
-            <div id="dayList"></div>
-          </section>
+        <div class="toggles" id="calToggles" role="group" aria-label="Kalender ein- und ausblenden"></div>
+        <div class="monthbar">
+          <button class="btn icon" data-act="cal-prev" aria-label="Voriger Monat">‹</button>
+          <h2 id="calTitle"></h2>
+          <button class="btn icon" data-act="cal-next" aria-label="Nächster Monat">›</button>
+          <button class="btn small" data-act="cal-today">Heute</button>
         </div>
-        <div id="calGoogle" hidden></div>
+        <div class="cal-grid" id="calGrid"></div>
+        <section class="panel day-panel">
+          <div class="panel-head"><h2 id="dayTitle"></h2><button class="btn small primary" data-act="event-new">Termin hinzufügen</button></div>
+          <div id="dayList"></div>
+        </section>
       </section>
 
       <section id="v-fin" class="view" hidden>
@@ -325,13 +332,19 @@ dialog h2{margin:0 0 14px;font-size:18px}
 
       <section id="v-set" class="view" hidden>
         <h1 class="view-title">Einstellungen</h1>
-        <section class="panel"><h2>Synchronisation</h2><div id="setSync"></div></section>
+        <section class="panel"><h2>Google-Konto und Synchronisation</h2><div id="setSync"></div></section>
         <section class="panel">
-          <h2>Google Kalender</h2>
-          <p class="muted">Füge jeden Kalender einzeln hinzu: Öffne Google Kalender am PC im Browser, gehe zu Einstellungen, wähle links den Kalender und kopiere unter „Kalender integrieren“ die Kalender-ID. Der komplette „Code zum Einbetten“ funktioniert auch, ebenso einer mit mehreren Kalendern. Private Termine sind nur sichtbar, wenn du im selben Browser bei Google angemeldet bist.</p>
+          <h2>Google-Kalender</h2>
+          <p class="muted">Hier erscheinen automatisch alle Kalender aus deinem Google-Konto, auch abonnierte und mit dir geteilte. Neue Kalender legst du in Google an, sie tauchen beim nächsten Aktualisieren auf.</p>
           <div id="gcalList"></div>
-          <textarea id="gcalInput" rows="2" placeholder="Kalender-ID oder Einbettungscode einfügen"></textarea>
-          <div class="row"><button class="btn primary" data-act="gcal-add">Kalender hinzufügen</button></div>
+        </section>
+        <section class="panel">
+          <h2>Sicherung</h2>
+          <p class="muted">Google Drive hebt frühere Versionen der Datendatei automatisch auf. Zusätzlich kannst du hier eine Sicherungsdatei herunterladen oder eine ältere Datei einspielen, zum Beispiel die letzte JSON aus deinem OneDrive-Ordner.</p>
+          <div class="row">
+            <button class="btn" data-act="import">Datei importieren</button>
+            <button class="btn" data-act="download">Sicherung herunterladen</button>
+          </div>
         </section>
       </section>
 
@@ -357,15 +370,19 @@ dialog h2{margin:0 0 14px;font-size:18px}
 <script>
 'use strict';
 
-/* ---------- Grundlagen ---------- */
-const KEEP_FILES = 10;                       // so viele Versionen bleiben im OneDrive-Ordner
-const LS_DATA = 'dashboard.daten';
-const LS_META = 'dashboard.meta';
-const FS = typeof window.showDirectoryPicker === 'function';
+/* ---------- Einstellungen der App ---------- */
+const GOOGLE_CLIENT_ID = '516131034071-1kqsvgrhjkgo0io7jpkqe9pqonnq7rhm.apps.googleusercontent.com';
+const SCOPE_CAL = 'https://www.googleapis.com/auth/calendar.readonly';
+const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive.file';   // nur Dateien, die das Dashboard selbst anlegt
+const DRIVE_FOLDER = 'Dashboard';
+const DRIVE_FILE = 'dashboard-daten.json';
+const CAL_API = 'https://www.googleapis.com/calendar/v3';
+const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
+const LS_DATA = 'dashboard.daten', LS_META = 'dashboard.meta', LS_TOKEN = 'dashboard.token', LS_GCACHE = 'dashboard.gcache';
 const DEFAULT_CATS = ['Wohnen','Lebensmittel','Auto','Versicherungen','Freizeit','Gesundheit','Gehalt','Sonstiges'];
-const FILE_RE = /^dashboard_.*\.json$/i;
-const OWN_RE = /^dashboard_\d{4}-\d{2}-\d{2}_\d{6}\.json$/;
 
+/* ---------- Hilfsfunktionen ---------- */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -375,10 +392,11 @@ const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
 const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const todayStr = () => ymd(new Date());
 const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
+const addMonths = (ym, n) => { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
 const stamp = () => { const d = new Date(); return `${ymd(d)}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`; };
 const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 const num2 = n => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtDateTime = iso => iso ? new Date(iso).toLocaleString('de-DE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'noch nichts gespeichert';
+const fmtDateTime = iso => iso ? new Date(iso).toLocaleString('de-DE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'noch nie';
 const fmtTime = iso => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 const monthName = ym => parseYmd(ym + '-01').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
 const count = (c, one, many) => `${c === 0 ? 'keine' : c} ${c === 1 ? one : many}`;
@@ -393,7 +411,6 @@ function dueLabel(s) {
   if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
   return d.toLocaleDateString('de-DE', opts);
 }
-
 function parseAmount(s) {
   s = String(s ?? '').trim().replace(/[\s€]/g, '');
   if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
@@ -401,45 +418,10 @@ function parseAmount(s) {
   return isFinite(n) && s !== '' ? Math.round(n * 100) / 100 : NaN;
 }
 
-/* ---------- Google Kalender ---------- */
-const GCAL_COLORS = ['#039BE5', '#33B679', '#8E24AA', '#E67C73', '#F6BF26', '#F4511E', '#7986CB', '#616161'];
-function gcalIdsFrom(input) {
-  input = (input || '').trim();
-  if (!input) return [];
-  const m = input.match(/src\s*=\s*["']([^"']+)["']/i);
-  const s = (m ? m[1] : input).replace(/&amp;/g, '&');
-  if (/^https?:\/\//i.test(s)) {
-    try {
-      const u = new URL(s);
-      if (!/(^|\.)google\.com$/i.test(u.hostname)) return [];
-      const ids = u.searchParams.getAll('src');
-      const cid = u.searchParams.get('cid');
-      if (cid) { try { ids.push(cid.includes('@') ? cid : atob(cid)); } catch {} }
-      return [...new Set(ids.filter(x => x.includes('@')))];
-    } catch { return []; }
-  }
-  return [...new Set(s.split(/[\s,;]+/).filter(x => x.includes('@')))];
-}
-function newGcal(id, i) {
-  let name = 'Kalender ' + (i + 1);
-  if (id.includes('#holiday')) name = 'Feiertage';
-  else if (id.includes('#contacts')) name = 'Geburtstage';
-  else if (/@(gmail|googlemail)\.com$/i.test(id)) name = 'Hauptkalender';
-  return { id, name, color: GCAL_COLORS[i % GCAL_COLORS.length], on: true };
-}
-function gcalUrl() {
-  const s = data.settings;
-  const vis = s.gcals.filter(c => c.on);
-  if (!vis.length) return '';
-  const p = ['wkst=2', 'hl=de', 'ctz=Europe%2FBerlin', 'showTitle=0', 'showPrint=0', 'showCalendars=0', 'showTz=0', 'mode=' + s.gcalMode];
-  for (const c of vis) p.push('src=' + encodeURIComponent(c.id), 'color=' + encodeURIComponent(c.color));
-  return 'https://calendar.google.com/calendar/embed?' + p.join('&');
-}
-
 /* ---------- Daten ---------- */
 function emptyData() {
-  return { app: 'dashboard', version: 1, updatedAt: null, todos: [], events: [], finance: [],
-           settings: { gcals: [], gcalMode: 'MONTH', categories: [...DEFAULT_CATS] } };
+  return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
+           settings: { gcals: [], showOwn: true, showTodos: true, categories: [...DEFAULT_CATS] } };
 }
 function normalize(d) {
   const e = emptyData();
@@ -447,216 +429,317 @@ function normalize(d) {
   const s = Object.assign(e.settings, d.settings || {});
   if (!Array.isArray(s.categories)) s.categories = [...DEFAULT_CATS];
   if (!Array.isArray(s.gcals)) s.gcals = [];
-  if (s.gcalSrc) {                                   // ältere Version mit nur einem Kalender übernehmen
-    for (const id of gcalIdsFrom(s.gcalSrc)) if (!s.gcals.some(c => c.id === id)) s.gcals.push(newGcal(id, s.gcals.length));
-    delete s.gcalSrc;
-  }
-  if (!['MONTH', 'WEEK', 'AGENDA'].includes(s.gcalMode)) s.gcalMode = 'MONTH';
-  return { app: 'dashboard', version: 1, updatedAt: d.updatedAt || null,
+  s.gcals = s.gcals.filter(c => c && c.id).map(c => ({ id: c.id, name: c.name || c.id, color: c.color || '#039BE5', on: c.on !== false }));
+  delete s.gcalSrc; delete s.gcalMode;                 // aus der Version mit eingebettetem Google-Kalender
+  if (typeof s.showOwn !== 'boolean') s.showOwn = true;
+  if (typeof s.showTodos !== 'boolean') s.showTodos = true;
+  return { app: 'dashboard', version: 2, updatedAt: d.updatedAt || null,
            todos: Array.isArray(d.todos) ? d.todos : [],
            events: Array.isArray(d.events) ? d.events : [],
            finance: Array.isArray(d.finance) ? d.finance : [],
            settings: s };
 }
-function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LS_DATA))); } catch { return emptyData(); } }
-function saveLocal() { try { localStorage.setItem(LS_DATA, JSON.stringify(data)); } catch (e) { toast('Speichern im Browser fehlgeschlagen: ' + e.message); } }
-function loadMeta() { try { return JSON.parse(localStorage.getItem(LS_META)) || {}; } catch { return {}; } }
-function saveMeta() { try { localStorage.setItem(LS_META, JSON.stringify(meta)); } catch {} }
+function lsGet(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fallback; } catch { return fallback; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn(e); } }
 const hasContent = d => d.todos.length || d.events.length || d.finance.length;
 
-let data = loadLocal();
-let meta = loadMeta();
-const ui = { view: meta.view || 'home', todoFilter: 'offen', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
-             calMode: 'own', finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
+let data = normalize(lsGet(LS_DATA, null));
+let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, dirty, lastSync, consented
+const saveLocal = () => lsSet(LS_DATA, data);
+const saveMeta = () => lsSet(LS_META, meta);
 
+const ui = { view: meta.view || 'home', todoFilter: 'offen', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+             finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
+
+/* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
 function commit() {
   data.updatedAt = new Date().toISOString();
   saveLocal();
-  scheduleFileSave();
+  meta.dirty = true; saveMeta();
+  scheduleSync();
   render();
 }
 function replaceData(d) {
   data = normalize(d);
   saveLocal();
-  const dlg = $('#dlg'); if (dlg.open) dlg.close();
+  if ($('#dlg').open) $('#dlg').close();
   render();
 }
 
-/* ---------- Ordner-Zugriff (PC: Edge/Chrome) ---------- */
-function idb() {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open('dashboard', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('kv');
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
+/* ---------- Google-Anmeldung ---------- */
+class AuthError extends Error { constructor() { super('Nicht mit Google verbunden'); this.name = 'AuthError'; } }
+const auth = Object.assign({ token: null, exp: 0 }, lsGet(LS_TOKEN, {}), { client: null, error: null });
+const signedIn = () => !!auth.token && Date.now() < auth.exp;
+
+function initGis() {
+  if (auth.client || !(window.google && google.accounts && google.accounts.oauth2)) return;
+  auth.client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPE_CAL + ' ' + SCOPE_DRIVE,
+    callback: r => {
+      if (r.error) { auth.error = r.error_description || r.error; renderStatus(); return; }
+      auth.token = r.access_token;
+      auth.exp = Date.now() + (Number(r.expires_in || 3600) - 60) * 1000;
+      lsSet(LS_TOKEN, { token: auth.token, exp: auth.exp });
+      auth.error = null;
+      if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE_CAL, SCOPE_DRIVE))
+        toast('Bitte beim Anmelden beide Häkchen setzen: Kalender ansehen und Drive-Dateien des Dashboards.');
+      meta.consented = true; saveMeta();
+      onSignedIn();
+    },
+    error_callback: e => { auth.error = e.type === 'popup_closed' ? null : (e.message || e.type); renderStatus(); }
   });
 }
-async function idbGet(k) {
-  const db = await idb();
-  return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+function signIn() {
+  initGis();
+  if (!auth.client) { toast('Die Google-Anmeldung lädt noch. Bitte gleich noch einmal tippen.'); return; }
+  auth.client.requestAccessToken({ prompt: meta.consented ? '' : 'consent' });
 }
-async function idbSet(k, v) {
-  const db = await idb();
-  return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); });
-}
-
-const sync = { dir: null, ready: false, needsPermission: false, fileName: null, lastSaved: null, error: null, timer: null, pending: false, busy: false };
-
-async function initFolder() {
-  if (!FS) return;
-  try { sync.dir = (await idbGet('ordner')) || null; } catch { sync.dir = null; }
-  if (sync.dir) {
-    try {
-      const p = await sync.dir.queryPermission({ mode: 'readwrite' });
-      if (p === 'granted') { sync.ready = true; await pullFromFolder(); }
-      else sync.needsPermission = true;
-    } catch (e) { sync.error = e.message; }
-  }
-  renderStatus(); renderSettings();
-}
-
-async function chooseFolder() {
-  try {
-    const dir = await window.showDirectoryPicker({ id: 'dashboard', mode: 'readwrite' });
-    Object.assign(sync, { dir, ready: true, needsPermission: false, fileName: null, error: null });
-    try { await idbSet('ordner', dir); } catch {}
-    const loaded = await pullFromFolder();
-    if (!loaded) toast('Ordner „' + dir.name + '“ verbunden');
-  } catch (e) {
-    if (e.name !== 'AbortError') { sync.error = e.message; toast('Ordner konnte nicht verbunden werden: ' + e.message); }
-  }
+function signOut() {
+  if (auth.token && window.google) { try { google.accounts.oauth2.revoke(auth.token, () => {}); } catch {} }
+  auth.token = null; auth.exp = 0; lsSet(LS_TOKEN, {});
+  meta.consented = false; saveMeta();
   render();
+  toast('Vom Google-Konto abgemeldet');
+}
+async function onSignedIn() {
+  renderStatus();
+  await syncData();
+  await refreshCalendars(true);
 }
 
-async function reconnect() {
-  if (!sync.dir) return chooseFolder();
-  try {
-    const p = await sync.dir.requestPermission({ mode: 'readwrite' });
-    if (p === 'granted') { Object.assign(sync, { ready: true, needsPermission: false, error: null }); await pullFromFolder(); }
-  } catch (e) { sync.error = e.message; }
-  render();
-}
-
-async function scanFolder() {
-  const out = [];
-  for await (const [name, h] of sync.dir.entries()) {
-    if (h.kind !== 'file' || !FILE_RE.test(name)) continue;
-    try {
-      const j = JSON.parse(await (await h.getFile()).text());
-      if (j && j.app === 'dashboard') out.push({ name, updatedAt: j.updatedAt || '', data: j });
-    } catch { /* unlesbare Datei überspringen */ }
+async function api(url, opts = {}) {
+  if (!signedIn()) throw new AuthError();
+  const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + auth.token } });
+  if (r.status === 401) { auth.token = null; lsSet(LS_TOKEN, {}); renderStatus(); throw new AuthError(); }
+  if (!r.ok) {
+    let msg = 'Fehler ' + r.status;
+    try { const j = await r.json(); if (j.error && j.error.message) msg = j.error.message; } catch {}
+    const e = new Error(msg); e.status = r.status; throw e;
   }
-  out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  return out;
+  return r;
+}
+const friendly = e => (!navigator.onLine || e instanceof TypeError) ? 'Keine Internetverbindung' : e.message;
+
+/* ---------- Google Drive: Datendatei ---------- */
+async function driveFolder() {
+  if (meta.folderId) return meta.folderId;
+  const q = encodeURIComponent(`name='${DRIVE_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const j = await (await api(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive`)).json();
+  let id = j.files && j.files[0] && j.files[0].id;
+  if (!id) {
+    const r = await api(`${DRIVE_API}/files?fields=id`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: DRIVE_FOLDER, mimeType: 'application/vnd.google-apps.folder' }) });
+    id = (await r.json()).id;
+  }
+  meta.folderId = id; saveMeta();
+  return id;
+}
+/* Sucht die Datendatei und liefert {id, updatedAt} oder null */
+async function driveFind() {
+  if (meta.fileId) {
+    try {
+      const j = await (await api(`${DRIVE_API}/files/${meta.fileId}?fields=id,trashed,appProperties`)).json();
+      if (!j.trashed) return { id: j.id, updatedAt: (j.appProperties && j.appProperties.updatedAt) || '' };
+    } catch (e) { if (e instanceof AuthError || !e.status) throw e; }
+    meta.fileId = null; meta.folderId = null; saveMeta();
+  }
+  const q = encodeURIComponent(`name='${DRIVE_FILE}' and trashed=false`);
+  const j = await (await api(`${DRIVE_API}/files?q=${q}&fields=files(id,appProperties)&orderBy=modifiedTime desc&spaces=drive`)).json();
+  const f = j.files && j.files[0];
+  if (!f) return null;
+  meta.fileId = f.id; saveMeta();
+  return { id: f.id, updatedAt: (f.appProperties && f.appProperties.updatedAt) || '' };
+}
+async function driveDownload(id) {
+  return (await api(`${DRIVE_API}/files/${id}?alt=media`)).json();
+}
+async function driveUpload() {
+  const info = { mimeType: 'application/json', appProperties: { updatedAt: data.updatedAt || '' } };
+  let url, method;
+  if (meta.fileId) { url = `${UPLOAD_API}/files/${meta.fileId}?uploadType=multipart&fields=id`; method = 'PATCH'; }
+  else { info.name = DRIVE_FILE; info.parents = [await driveFolder()]; url = `${UPLOAD_API}/files?uploadType=multipart&fields=id`; method = 'POST'; }
+  const b = 'dashboard' + Math.random().toString(36).slice(2);
+  const body = `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(info)}\r\n` +
+               `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(data)}\r\n--${b}--`;
+  const j = await (await api(url, { method, headers: { 'Content-Type': `multipart/related; boundary=${b}` }, body })).json();
+  meta.fileId = j.id;
+  meta.baseRemote = data.updatedAt || '';
+  meta.dirty = false;
+  meta.lastSync = new Date().toISOString();
+  saveMeta();
 }
 
-/* Lädt die neueste Datei, falls sie neuer ist als der Stand im Browser. Gibt true zurück, wenn geladen wurde. */
-async function pullFromFolder() {
-  if (!sync.ready || sync.busy) return false;
-  sync.busy = true;
-  let loaded = false;
+const sync = { busy: false, again: false, timer: null, error: null };
+function scheduleSync() {
+  clearTimeout(sync.timer);
+  renderStatus();
+  if (signedIn()) sync.timer = setTimeout(syncData, 1500);
+}
+/* Abgleich: neuere Seite gewinnt; wurde auf beiden Seiten geändert, wird nachgefragt */
+async function syncData() {
+  clearTimeout(sync.timer); sync.timer = null;
+  if (!signedIn()) { renderStatus(); return; }
+  if (sync.busy) { sync.again = true; return; }
+  sync.busy = true; renderStatus();
   try {
-    const files = await scanFolder();
-    const newest = files[0];
-    if (newest && (!data.updatedAt || newest.updatedAt > data.updatedAt)) {
-      replaceData(newest.data);
-      loaded = true;
-      toast('Neuester Stand geladen (' + fmtDateTime(newest.updatedAt) + ')');
-    } else if (hasContent(data) && (!newest || data.updatedAt > newest.updatedAt)) {
-      await writeToFolder();
+    const remote = await driveFind();
+    const now = new Date().toISOString();
+    if (!remote) {
+      if (hasContent(data) || meta.dirty) await driveUpload();
+      else { meta.lastSync = now; saveMeta(); }
+    } else if (remote.updatedAt === data.updatedAt) {
+      meta.dirty = false; meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
+    } else if (remote.updatedAt === (meta.baseRemote || '')) {
+      if (meta.dirty) await driveUpload();
+      else { meta.lastSync = now; saveMeta(); }
+    } else if (!meta.dirty) {
+      replaceData(await driveDownload(remote.id));
+      meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
+      toast('Neuester Stand aus Google Drive geladen');
+    } else {
+      const takeRemote = confirm(
+        `Auf einem anderen Gerät wurde am ${fmtDateTime(remote.updatedAt)} gespeichert, und auf diesem Gerät gibt es noch nicht hochgeladene Änderungen.\n\n` +
+        'OK: Stand aus Google Drive laden (Änderungen auf diesem Gerät verwerfen)\n' +
+        'Abbrechen: Stand dieses Geräts behalten und hochladen (der Drive-Stand bleibt im Versionsverlauf von Google Drive erhalten)');
+      if (takeRemote) {
+        replaceData(await driveDownload(remote.id));
+        meta.dirty = false; meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
+      } else await driveUpload();
     }
     sync.error = null;
   } catch (e) {
-    sync.error = e.message;
-    if (e.name === 'NotAllowedError') { sync.ready = false; sync.needsPermission = true; }
+    if (!(e instanceof AuthError)) sync.error = friendly(e);
   } finally {
     sync.busy = false;
-    renderStatus();
-  }
-  return loaded;
-}
-
-async function writeToFolder() {
-  if (!sync.ready) return;
-  if (!sync.fileName) sync.fileName = `dashboard_${stamp()}.json`;
-  const fh = await sync.dir.getFileHandle(sync.fileName, { create: true });
-  const w = await fh.createWritable();
-  await w.write(JSON.stringify(data, null, 2));
-  await w.close();
-  sync.lastSaved = new Date().toISOString();
-  await prune();
-}
-
-async function prune() {
-  const names = [];
-  for await (const [name, h] of sync.dir.entries()) if (h.kind === 'file' && OWN_RE.test(name)) names.push(name);
-  names.sort().reverse();
-  for (const n of names.slice(KEEP_FILES)) {
-    if (n === sync.fileName) continue;
-    try { await sync.dir.removeEntry(n); } catch {}
+    renderStatus(); renderSettings();
+    if (sync.again) { sync.again = false; syncData(); }
   }
 }
 
-function scheduleFileSave() {
-  if (!sync.ready) { renderStatus(); return; }
-  sync.pending = true;
-  renderStatus();
-  clearTimeout(sync.timer);
-  sync.timer = setTimeout(async () => {
-    try { await writeToFolder(); sync.error = null; }
-    catch (e) {
-      sync.error = e.message;
-      if (e.name === 'NotAllowedError') { sync.ready = false; sync.needsPermission = true; }
-    }
-    sync.pending = false;
-    renderStatus();
-  }, 1000);
-}
+/* ---------- Google Kalender ---------- */
+let gcache = lsGet(LS_GCACHE, {});      // { kalenderId: { 'JJJJ-MM': { at, items } } }
+const cal = { busy: false, error: null, listLoaded: false, errors: {} };
 
-/* ---------- Export / Import (Handy, Tablet, Backup) ---------- */
-function exportPayload() {
-  const name = `dashboard_${stamp()}.json`;
-  return { name, blob: new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }) };
+function saveGcache() {
+  const keep = new Set([-2, -1, 0, 1, 2, 3].map(n => addMonths(todayStr().slice(0, 7), n)));
+  [-1, 0, 1].forEach(n => keep.add(addMonths(ui.calMonth, n)));
+  for (const id of Object.keys(gcache)) {
+    if (!data.settings.gcals.some(c => c.id === id)) { delete gcache[id]; continue; }
+    for (const ym of Object.keys(gcache[id])) if (!keep.has(ym)) delete gcache[id][ym];
+  }
+  lsSet(LS_GCACHE, gcache);
 }
-function canShareFiles() {
-  try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 't.json', { type: 'application/json' })] })); }
-  catch { return false; }
+async function loadCalendarList() {
+  const j = await (await api(`${CAL_API}/users/me/calendarList?minAccessRole=reader&maxResults=250`)).json();
+  const g = data.settings.gcals;
+  let changed = false;
+  for (const it of j.items || []) {
+    const name = it.summaryOverride || it.summary || it.id;
+    const color = it.backgroundColor || '#039BE5';
+    const ex = g.find(c => c.id === it.id);
+    if (!ex) { g.push({ id: it.id, name, color, on: it.selected === true }); changed = true; }
+    else if (ex.name !== name || ex.color !== color) { ex.name = name; ex.color = color; changed = true; }
+  }
+  if (changed) commit();
 }
-function markExported() { meta.lastExportedAt = data.updatedAt || ''; saveMeta(); renderStatus(); renderSettings(); }
-async function shareExport() {
-  const { name, blob } = exportPayload();
+function mapEvent(e) {
+  let date, endDate, time = '';
+  if (e.start && e.start.date) {
+    date = e.start.date;
+    endDate = addDays((e.end && e.end.date) || date, -1);
+  } else {
+    const s = new Date(e.start.dateTime), en = e.end && e.end.dateTime ? new Date(e.end.dateTime) : s;
+    date = ymd(s); time = `${pad(s.getHours())}:${pad(s.getMinutes())}`;
+    endDate = ymd(new Date(Math.max(s.getTime(), en.getTime() - 1)));
+  }
+  if (endDate < date) endDate = date;
+  return { id: e.id, title: e.summary || '(ohne Titel)', date, endDate, time, location: e.location || '', link: e.htmlLink || '' };
+}
+async function fetchMonth(calId, ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const tmin = new Date(y, m - 1, 1).toISOString(), tmax = new Date(y, m, 1).toISOString();
+  const items = [];
+  let pageToken = '';
+  do {
+    const url = `${CAL_API}/calendars/${encodeURIComponent(calId)}/events?singleEvents=true&orderBy=startTime&maxResults=250` +
+                `&timeMin=${encodeURIComponent(tmin)}&timeMax=${encodeURIComponent(tmax)}${pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''}`;
+    const j = await (await api(url)).json();
+    for (const e of j.items || []) if (e.status !== 'cancelled' && e.start) items.push(mapEvent(e));
+    pageToken = j.nextPageToken;
+  } while (pageToken);
+  (gcache[calId] = gcache[calId] || {})[ym] = { at: Date.now(), items };
+}
+function neededMonths() {
+  const t = todayStr();
+  return [...new Set([addMonths(ui.calMonth, -1), ui.calMonth, addMonths(ui.calMonth, 1), t.slice(0, 7), addDays(t, 14).slice(0, 7)])];
+}
+async function refreshCalendars(force) {
+  if (!signedIn() || cal.busy) { renderCal(); return; }
+  cal.busy = true; renderCalState();
   try {
-    await navigator.share({ files: [new File([blob], name, { type: 'application/json' })], title: 'Dashboard-Daten' });
-    markExported();
-    toast('Datei ' + name + ' geteilt');
+    if (force || !cal.listLoaded) { await loadCalendarList(); cal.listLoaded = true; }
+    const jobs = [];
+    for (const c of data.settings.gcals.filter(c => c.on))
+      for (const ym of neededMonths()) {
+        const hit = gcache[c.id] && gcache[c.id][ym];
+        if (force || !hit || Date.now() - hit.at > 5 * 60 * 1000)
+          jobs.push(fetchMonth(c.id, ym).then(() => { delete cal.errors[c.id]; }, err => { if (err instanceof AuthError) throw err; cal.errors[c.id] = err.message; }));
+      }
+    await Promise.all(jobs);
+    saveGcache();
+    cal.error = null;
   } catch (e) {
-    if (e.name !== 'AbortError') { toast('Teilen nicht möglich, die Datei wird heruntergeladen.'); downloadExport(); }
+    if (!(e instanceof AuthError)) cal.error = friendly(e);
+  } finally {
+    cal.busy = false;
+    renderCal(); renderHome(); renderSettings(); renderStatus();
   }
 }
+/* Alle sichtbaren Einträge eines Tages, gemischt aus Dashboard und Google */
+function entriesOn(ds) {
+  const s = data.settings, out = [];
+  if (s.showOwn) for (const e of data.events) if (e.date === ds) out.push({ kind: 'own', id: e.id, title: e.title, time: e.time || '', note: e.note || '' });
+  for (const c of s.gcals) {
+    if (!c.on || !gcache[c.id]) continue;
+    const seen = new Set();
+    for (const ym of [ds.slice(0, 7), addMonths(ds.slice(0, 7), -1)]) {
+      const block = gcache[c.id][ym];
+      if (!block) continue;
+      for (const e of block.items) {
+        if (e.date <= ds && ds <= e.endDate && !seen.has(e.id)) {
+          seen.add(e.id);
+          out.push({ kind: 'google', id: e.id, title: e.title, time: e.date === ds ? e.time : '', location: e.location, link: e.link, cal: c });
+        }
+      }
+    }
+  }
+  out.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  return out;
+}
+const todosOn = ds => data.settings.showTodos ? data.todos.filter(x => !x.done && x.due === ds) : [];
+
+/* ---------- Sicherung (Datei) ---------- */
 function downloadExport() {
-  const { name, blob } = exportPayload();
+  const name = `dashboard_${stamp()}.json`;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name;
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-  markExported();
   toast('Heruntergeladen als ' + name);
 }
 async function importFile(file) {
   try {
     const j = JSON.parse(await file.text());
     if (!j || j.app !== 'dashboard') throw new Error('Das ist keine Dashboard-Datei.');
-    let older = false;
-    if (data.updatedAt && j.updatedAt && j.updatedAt < data.updatedAt) {
-      if (!confirm(`Die Datei ist älter (${fmtDateTime(j.updatedAt)}) als der Stand auf diesem Gerät (${fmtDateTime(data.updatedAt)}). Trotzdem laden?`)) return;
-      older = true;
-    }
+    if (hasContent(data) && !confirm(`Den Stand auf diesem Gerät durch die Datei vom ${fmtDateTime(j.updatedAt)} ersetzen?`)) return;
+    const keepCals = data.settings.gcals;
     replaceData(j);
-    if (older) { data.updatedAt = new Date().toISOString(); saveLocal(); }
-    meta.lastExportedAt = data.updatedAt; saveMeta();
-    if (sync.ready) await writeToFolder();
-    render();
-    toast('Daten geladen (Stand ' + fmtDateTime(data.updatedAt) + ')');
+    if (!data.settings.gcals.length) data.settings.gcals = keepCals;
+    commit();
+    toast('Datei übernommen' + (signedIn() ? ', wird nach Google Drive hochgeladen' : ''));
+    refreshCalendars(false);
   } catch (e) { toast('Import fehlgeschlagen: ' + e.message); }
 }
 
@@ -670,18 +753,22 @@ function renderNav() {
 
 function renderStatus() {
   const el = $('#syncStatus');
-  let html = '', cls = '';
-  if (FS) {
-    if (!sync.dir) { html = '<span>Kein OneDrive-Ordner verbunden</span><button class="btn small" data-act="choose-folder">Ordner wählen</button>'; cls = 'warn'; }
-    else if (sync.needsPermission || !sync.ready) { html = `<span>Zugriff auf „${esc(sync.dir.name)}“ bestätigen</span><button class="btn small primary" data-act="reconnect">Verbinden</button>`; cls = 'warn'; }
-    else if (sync.error) { html = `<span>Speichern fehlgeschlagen: ${esc(sync.error)}</span><button class="btn small" data-act="reconnect">Erneut versuchen</button>`; cls = 'err'; }
-    else if (sync.pending) { html = '<span>Speichert …</span>'; }
-    else { html = `<span>OneDrive-Ordner „${esc(sync.dir.name)}“${sync.lastSaved ? ', gespeichert um ' + fmtTime(sync.lastSaved) : ', aktuell'}</span>`; cls = 'ok'; }
+  let html, cls = '';
+  if (!signedIn()) {
+    const label = meta.consented ? 'Google-Verbindung abgelaufen' : 'Nicht mit Google verbunden';
+    html = `<span>${label}${meta.dirty ? ', Änderungen warten aufs Hochladen' : ''}</span><button class="btn small primary" data-act="signin">${meta.consented ? 'Verbinden' : 'Mit Google verbinden'}</button>`;
+    cls = 'warn';
+    if (auth.error) html = `<span>Anmeldung fehlgeschlagen: ${esc(auth.error)}</span><button class="btn small primary" data-act="signin">Erneut versuchen</button>`;
+  } else if (sync.busy) {
+    html = '<span>Synchronisiert …</span>';
+  } else if (sync.error) {
+    html = `<span>Synchronisierung fehlgeschlagen: ${esc(sync.error)}</span><button class="btn small" data-act="sync">Erneut versuchen</button>`;
+    cls = 'err';
+  } else if (meta.dirty) {
+    html = '<span>Wird gleich gespeichert …</span>';
   } else {
-    const unexported = data.updatedAt && data.updatedAt > (meta.lastExportedAt || '');
-    if (!data.updatedAt) { html = '<span>Neueste Datei aus OneDrive laden</span><button class="btn small" data-act="import">Importieren</button>'; cls = 'warn'; }
-    else if (unexported) { html = '<span>Änderungen noch nicht in OneDrive</span><button class="btn small primary" data-act="export">Exportieren</button>'; cls = 'warn'; }
-    else { html = '<span>Stand ist exportiert</span><button class="btn small" data-act="import">Importieren</button>'; cls = 'ok'; }
+    html = `<span>Mit Google Drive synchronisiert${meta.lastSync ? ' um ' + fmtTime(meta.lastSync) : ''}</span>`;
+    cls = 'ok';
   }
   el.className = 'sync ' + cls;
   el.innerHTML = html;
@@ -696,7 +783,16 @@ function todoItem(x) {
   </li>`;
 }
 const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.created || '').localeCompare(b.created || '');
-const byWhen = (a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99');
+
+/* Eintrag als Zeile (Übersicht, Tagesansicht) */
+function entryRow(e, when) {
+  const dot = e.kind === 'google' ? `<span class="cdot" style="--c:${esc(e.cal.color)}"></span>` : `<span class="cdot" style="--c:var(--event)"></span>`;
+  const sub = [e.kind === 'google' ? e.cal.name : 'Dashboard', e.location || e.note].filter(Boolean).join(', ');
+  const attrs = e.kind === 'google'
+    ? `data-act="gevent-open" data-link="${esc(e.link)}"`
+    : `data-act="event-edit" data-id="${esc(e.id)}"`;
+  return `<li><button class="mini-row" ${attrs}><span class="when">${when}</span><span class="what">${dot}${esc(e.title)}<span class="sub">${esc(sub)}</span></span></button></li>`;
+}
 
 function renderHome() {
   const t = todayStr(), now = new Date();
@@ -705,7 +801,7 @@ function renderHome() {
   const open = data.todos.filter(x => !x.done);
   const over = open.filter(x => x.due && x.due < t).length;
   const dueToday = open.filter(x => x.due === t).length;
-  const evToday = data.events.filter(e => e.date === t).length;
+  const evToday = entriesOn(t).length;
   let sum = `Heute ${count(dueToday, 'Aufgabe', 'Aufgaben')} und ${count(evToday, 'Termin', 'Termine')}.`;
   if (over) sum += ` ${over} ${over === 1 ? 'Aufgabe ist' : 'Aufgaben sind'} überfällig.`;
   $('#heroSum').textContent = sum;
@@ -715,14 +811,16 @@ function renderHome() {
     ? `<ul class="todos">${soon.slice(0, 8).map(todoItem).join('')}</ul>${soon.length > 8 ? `<p class="muted">und ${soon.length - 8} weitere</p>` : ''}`
     : `<p class="empty">Nichts fällig.</p><div class="row"><button class="btn small" data-act="goto" data-view="todos" data-focus="#todoForm [name=text]">Aufgabe anlegen</button></div>`;
 
-  const evs = data.events.filter(e => e.date >= t && e.date <= addDays(t, 14)).sort(byWhen);
-  $('#homeEvents').innerHTML = (evs.length
-    ? `<ul class="mini">${evs.slice(0, 6).map(e => `<li><button class="mini-row" data-act="event-edit" data-id="${esc(e.id)}"><span class="when">${esc(dueLabel(e.date))}${e.time ? '<br>' + esc(e.time) : ''}</span><span class="what">${esc(e.title)}</span></button></li>`).join('')}</ul>`
-    : '<p class="empty">Keine Termine in den nächsten 14 Tagen.</p>')
-    + (data.settings.gcals.length ? '<div class="row"><button class="btn small" data-act="goto-google">Google Kalender anzeigen</button></div>' : '');
+  const rows = [];
+  for (let i = 0; i <= 14 && rows.length < 8; i++) {
+    const ds = addDays(t, i);
+    for (const e of entriesOn(ds)) rows.push(entryRow(e, esc(dueLabel(ds)) + (e.time ? '<br>' + esc(e.time) : '')));
+  }
+  $('#homeEvents').innerHTML = rows.length
+    ? `<ul class="mini">${rows.slice(0, 8).join('')}</ul>`
+    : `<p class="empty">Keine Termine in den nächsten 14 Tagen.</p>${!signedIn() && data.settings.gcals.length ? '<p class="muted">Verbinde dich mit Google, um deine Google-Termine zu sehen.</p>' : ''}`;
 
-  const ym = t.slice(0, 7);
-  const s = finSums(ym);
+  const ym = t.slice(0, 7), s = finSums(ym);
   $('#homeFinTitle').textContent = 'Finanzen im ' + parseYmd(ym + '-01').toLocaleDateString('de-DE', { month: 'long' });
   $('#homeFin').innerHTML = s.n
     ? `<div class="money"><span>Einnahmen</span><span class="amt in">${eur.format(s.inc)}</span><span>Ausgaben</span><span class="amt out">${eur.format(s.exp)}</span><span class="total">Saldo</span><span class="total amt ${s.bal < 0 ? 'out' : 'in'}">${eur.format(s.bal)}</span></div>`
@@ -732,14 +830,10 @@ function renderHome() {
 function todoGroups(list) {
   const t = todayStr(), tm = addDays(t, 1), wk = addDays(t, 7);
   const g = [['Überfällig', []], ['Heute', []], ['Morgen', []], ['Nächste 7 Tage', []], ['Später', []], ['Ohne Datum', []]];
-  for (const x of list) {
-    const i = !x.due ? 5 : x.due < t ? 0 : x.due === t ? 1 : x.due === tm ? 2 : x.due <= wk ? 3 : 4;
-    g[i][1].push(x);
-  }
+  for (const x of list) g[!x.due ? 5 : x.due < t ? 0 : x.due === t ? 1 : x.due === tm ? 2 : x.due <= wk ? 3 : 4][1].push(x);
   g.forEach(([, items]) => items.sort(byDue));
   return g;
 }
-
 function renderTodos() {
   const f = ui.todoFilter;
   $$('#todoFilter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === f));
@@ -747,42 +841,45 @@ function renderTodos() {
   const done = data.todos.filter(x => x.done).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
   $('#clearDone').hidden = !(f !== 'offen' && done.length);
   let h = '';
-  if (f !== 'erledigt') {
+  if (f !== 'erledigt')
     for (const [label, items] of todoGroups(open))
       if (items.length) h += `<h3 class="group-label${label === 'Überfällig' ? ' over' : ''}">${label}</h3><ul class="todos">${items.map(todoItem).join('')}</ul>`;
-  }
   if (f !== 'offen' && done.length) h += `<h3 class="group-label">Erledigt</h3><ul class="todos">${done.map(todoItem).join('')}</ul>`;
   if (!h) h = f === 'erledigt' ? '<p class="empty" style="margin-top:16px">Noch nichts erledigt.</p>' : '<p class="empty" style="margin-top:16px">Keine offenen Aufgaben. Trag oben die nächste ein.</p>';
   $('#todoList').innerHTML = h;
 }
 
-function itemsOn(date) {
-  return {
-    evs: data.events.filter(e => e.date === date).sort(byWhen),
-    tds: data.todos.filter(x => !x.done && x.due === date)
-  };
+function renderCalState() {
+  const el = $('#calState');
+  if (cal.busy) el.textContent = 'Lädt Google-Termine …';
+  else if (!signedIn() && data.settings.gcals.length) el.textContent = 'Google nicht verbunden, zeigt den letzten Stand';
+  else if (!signedIn()) el.textContent = 'Mit Google verbinden, um deine Kalender zu sehen';
+  else if (cal.error) el.textContent = 'Laden fehlgeschlagen: ' + cal.error;
+  else el.textContent = '';
 }
-
 function renderCal() {
-  const google = ui.calMode === 'google';
-  $$('#calMode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === ui.calMode));
-  $('#calOwn').hidden = google;
-  $('#calGoogle').hidden = !google;
-  if (google) { renderGoogle(); return; }
+  const s = data.settings;
+  renderCalState();
+  $('#calToggles').innerHTML =
+    `<label class="gtog" style="--c:var(--event)"><input type="checkbox" data-vis="showOwn"${s.showOwn ? ' checked' : ''}><span class="dot"></span>Dashboard-Termine</label>` +
+    `<label class="gtog" style="--c:var(--muted)"><input type="checkbox" data-vis="showTodos"${s.showTodos ? ' checked' : ''}><span class="dot"></span>Aufgaben</label>` +
+    s.gcals.map((c, i) => `<label class="gtog" style="--c:${esc(c.color)}" title="${esc(cal.errors[c.id] || '')}"><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}><span class="dot"></span>${esc(c.name)}${cal.errors[c.id] ? ' (Fehler)' : ''}</label>`).join('');
 
   const [y, m] = ui.calMonth.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
   const offset = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const cells = Math.ceil((offset + daysInMonth) / 7) * 7;
+  const cells = Math.ceil((offset + new Date(y, m, 0).getDate()) / 7) * 7;
   const t = todayStr();
   $('#calTitle').textContent = monthName(ui.calMonth);
   let h = ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => `<div class="cal-wd">${d}</div>`).join('');
   for (let i = 0; i < cells; i++) {
     const d = new Date(y, m - 1, 1 - offset + i), ds = ymd(d);
-    const { evs, tds } = itemsOn(ds);
-    const all = [...evs.map(e => `<span class="ci ev">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`),
-                 ...tds.map(x => `<span class="ci td">${esc(x.title)}</span>`)];
+    const all = [
+      ...entriesOn(ds).map(e => e.kind === 'google'
+        ? `<span class="ci g" style="--c:${esc(e.cal.color)}">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`
+        : `<span class="ci ev">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`),
+      ...todosOn(ds).map(x => `<span class="ci td">${esc(x.title)}</span>`)
+    ];
     const cls = ['cal-cell', d.getMonth() !== m - 1 ? 'out' : '', ds === t ? 'today' : '', ds === ui.calDay ? 'sel' : ''].join(' ');
     const label = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (all.length ? `, ${all.length} Einträge` : '');
     h += `<button class="${cls}" data-act="cal-day" data-d="${ds}" aria-label="${esc(label)}"><span class="dnum">${d.getDate()}</span><span class="items">${all.slice(0, 3).join('')}${all.length > 3 ? `<span class="ci more">+${all.length - 3}</span>` : ''}</span></button>`;
@@ -790,37 +887,11 @@ function renderCal() {
   $('#calGrid').innerHTML = h;
 
   $('#dayTitle').textContent = parseYmd(ui.calDay).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
-  const { evs, tds } = itemsOn(ui.calDay);
+  const evs = entriesOn(ui.calDay), tds = todosOn(ui.calDay);
   let dl = '';
-  if (evs.length) dl += `<ul class="mini">${evs.map(e => `<li><button class="mini-row" data-act="event-edit" data-id="${esc(e.id)}"><span class="when">${e.time ? esc(e.time) : 'ganztägig'}</span><span class="what">${esc(e.title)}${e.note ? `<span class="todo-note" style="display:block">${esc(e.note)}</span>` : ''}</span></button></li>`).join('')}</ul>`;
+  if (evs.length) dl += `<ul class="mini">${evs.map(e => entryRow(e, e.time ? esc(e.time) : 'ganztägig')).join('')}</ul>`;
   if (tds.length) dl += `<h3 class="group-label">Aufgaben</h3><ul class="todos">${tds.map(todoItem).join('')}</ul>`;
   $('#dayList').innerHTML = dl || '<p class="empty">Nichts geplant.</p>';
-}
-
-function renderGoogle() {
-  const st = data.settings, wrap = $('#calGoogle');
-  if (!st.gcals.length) {
-    wrap.dataset.built = '';
-    wrap.innerHTML = `<section class="panel"><p class="empty">Noch kein Google Kalender eingebunden.</p><div class="row"><button class="btn primary" data-act="goto" data-view="set">In den Einstellungen einbinden</button></div></section>`;
-    return;
-  }
-  if (wrap.dataset.built !== '1') {
-    wrap.dataset.built = '1';
-    wrap.innerHTML = `<div id="gcalCtrl"></div><div id="gcalFrame"></div>
-      <p class="muted">Nur Anzeige. Neue Google-Termine legst du direkt in Google Kalender an. <a href="https://calendar.google.com/" target="_blank" rel="noopener">Google Kalender öffnen</a></p>`;
-  }
-  $('#gcalCtrl').innerHTML = `<div class="gcal-bar">
-    <div class="gcal-toggles" role="group" aria-label="Kalender ein- und ausblenden">${st.gcals.map((c, i) =>
-      `<label class="gtog"><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</label>`).join('')}</div>
-    <div class="seg">${[['MONTH', 'Monat'], ['WEEK', 'Woche'], ['AGENDA', 'Liste']].map(([v, l]) =>
-      `<button type="button" data-act="gcal-mode" data-m="${v}" aria-pressed="${st.gcalMode === v}">${l}</button>`).join('')}</div>
-  </div>`;
-  const frame = $('#gcalFrame'), src = gcalUrl();
-  if (frame.dataset.src === src && frame.innerHTML) return;   // iframe nur bei Änderung neu laden
-  frame.dataset.src = src;
-  frame.innerHTML = src
-    ? `<div class="gcal-wrap"><iframe src="${esc(src)}" title="Google Kalender" loading="lazy"></iframe></div>`
-    : '<section class="panel"><p class="empty">Alle Kalender sind ausgeblendet. Tippe oben einen an, um ihn einzublenden.</p></section>';
 }
 
 function finSums(ym) {
@@ -828,7 +899,6 @@ function finSums(ym) {
   for (const f of data.finance) if (f.date && f.date.slice(0, 7) === ym) { n++; if (f.type === 'einnahme') inc += f.amount; else exp += f.amount; }
   return { inc, exp, bal: inc - exp, n };
 }
-
 function renderFin() {
   const ym = ui.finMonth;
   $('#finTitle').textContent = monthName(ym);
@@ -838,10 +908,8 @@ function renderFin() {
     <div class="stat in"><span>Einnahmen</span><b>${eur.format(s.inc)}</b></div>
     <div class="stat out"><span>Ausgaben</span><b>${eur.format(s.exp)}</b></div>
     <div class="stat ${s.bal < 0 ? 'out' : 'in'}"><span>Saldo</span><b>${eur.format(s.bal)}</b></div>`;
-
   const cats = new Set([...data.settings.categories, ...data.finance.map(f => f.cat).filter(Boolean)]);
   $('#catList').innerHTML = [...cats].sort((a, b) => a.localeCompare(b, 'de')).map(c => `<option value="${esc(c)}"></option>`).join('');
-
   const entries = data.finance.filter(f => f.date && f.date.slice(0, 7) === ym)
     .sort((a, b) => b.date.localeCompare(a.date) || (b.created || '').localeCompare(a.created || ''));
   const byCat = {};
@@ -857,28 +925,21 @@ function renderFin() {
 }
 
 function renderSettings() {
-  let h = '';
-  if (FS) {
-    h += '<p>Am PC speichert das Dashboard direkt in einen Ordner. Wähle dafür einen Ordner in deinem OneDrive, zum Beispiel <b>OneDrive\\Dashboard</b>. Beim Öffnen wird automatisch die neueste Datei aus diesem Ordner geladen.</p>';
-    if (sync.dir) h += `<p class="muted">Verbundener Ordner: <b>${esc(sync.dir.name)}</b>${sync.lastSaved ? '. Zuletzt gespeichert: ' + fmtDateTime(sync.lastSaved) : ''}.</p>`;
-    h += `<div class="row"><button class="btn primary" data-act="choose-folder">${sync.dir ? 'Anderen Ordner wählen' : 'Ordner wählen'}</button>${sync.ready ? '<button class="btn" data-act="pull">Neueste Datei jetzt laden</button>' : ''}</div>`;
+  let h;
+  if (signedIn()) {
+    h = `<p>Verbunden. Deine Daten liegen in Google Drive im Ordner <b>${DRIVE_FOLDER}</b> als <b>${DRIVE_FILE}</b>. Letzter Abgleich: ${fmtDateTime(meta.lastSync)}.</p>
+         <div class="row"><button class="btn primary" data-act="sync">Jetzt synchronisieren</button><button class="btn" data-act="signout">Abmelden</button></div>`;
   } else {
-    h += '<p>Auf diesem Gerät tauschst du die Daten über Dateien aus: Importiere vor dem Bearbeiten die neueste Datei aus deinem OneDrive-Ordner und exportiere sie danach wieder dorthin.</p>';
+    h = `<p>Melde dich mit deinem Google-Konto an. Dann werden Aufgaben, Termine und Finanzen über Google Drive auf allen Geräten abgeglichen, und deine Google-Kalender erscheinen im Kalender.</p>
+         <div class="row"><button class="btn primary" data-act="signin">Mit Google verbinden</button></div>`;
   }
-  h += '<h3>Datei austauschen</h3><div class="row"><button class="btn" data-act="import">Datei importieren</button>';
-  if (!FS && canShareFiles()) h += '<button class="btn" data-act="share">An OneDrive senden</button>';
-  h += '<button class="btn" data-act="download">Datei herunterladen</button></div>';
-  h += `<p class="muted">Stand auf diesem Gerät: ${fmtDateTime(data.updatedAt)}. Enthält ${data.todos.length} Aufgaben, ${data.events.length} Termine und ${data.finance.length} Buchungen.</p>`;
+  h += `<p class="muted">Auf diesem Gerät: ${data.todos.length} Aufgaben, ${data.events.length} eigene Termine, ${data.finance.length} Buchungen. Stand ${fmtDateTime(data.updatedAt)}.</p>`;
   $('#setSync').innerHTML = h;
-  const gl = $('#gcalList');
-  if (!gl.contains(document.activeElement)) {
-    gl.innerHTML = data.settings.gcals.map((c, i) => `<div class="gcal-row">
-      <input type="color" data-gcal-color="${i}" value="${esc(c.color)}" aria-label="Farbe für ${esc(c.name)}">
-      <input data-gcal-name="${i}" value="${esc(c.name)}" aria-label="Name" title="${esc(c.id)}">
-      <label class="show"><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}>Anzeigen</label>
-      <button class="btn small danger" data-act="gcal-del" data-i="${i}" aria-label="${esc(c.name)} entfernen">Entfernen</button>
-    </div>`).join('');
-  }
+
+  const g = data.settings.gcals;
+  $('#gcalList').innerHTML = g.length
+    ? g.map((c, i) => `<div class="set-row"><span class="cdot" style="--c:${esc(c.color)}"></span><span class="name">${esc(c.name)}${cal.errors[c.id] ? `<span class="sub">Fehler: ${esc(cal.errors[c.id])}</span>` : ''}</span><label><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}>Anzeigen</label></div>`).join('')
+    : `<p class="empty">${signedIn() ? 'Noch keine Kalender geladen.' : 'Nach der Anmeldung erscheinen hier deine Kalender.'}</p>`;
 }
 
 /* ---------- Dialog ---------- */
@@ -923,11 +984,11 @@ function editEvent(id, date) {
   const ev = id ? data.events.find(x => x.id === id) : null;
   if (id && !ev) return;
   openDialog({
-    title: ev ? 'Termin bearbeiten' : 'Neuer Termin',
-    fields: [{ name: 'text', label: 'Titel', value: ev?.title, required: true },
-             { name: 'date', label: 'Datum', type: 'date', value: ev?.date || date || todayStr(), required: true },
-             { name: 'time', label: 'Uhrzeit (optional)', type: 'time', value: ev?.time },
-             { name: 'note', label: 'Notiz', type: 'textarea', value: ev?.note }],
+    title: ev ? 'Termin bearbeiten' : 'Neuer Dashboard-Termin',
+    fields: [{ name: 'text', label: 'Titel', value: ev && ev.title, required: true },
+             { name: 'date', label: 'Datum', type: 'date', value: (ev && ev.date) || date || todayStr(), required: true },
+             { name: 'time', label: 'Uhrzeit (optional)', type: 'time', value: ev && ev.time },
+             { name: 'note', label: 'Notiz', type: 'textarea', value: ev && ev.note }],
     onSave: v => {
       const rec = { title: v.text.trim(), date: v.date, time: v.time || '', note: (v.note || '').trim() };
       if (!rec.title || !rec.date) return false;
@@ -959,18 +1020,15 @@ function editFin(id) {
   });
 }
 
-/* ---------- Ereignisse ---------- */
+/* ---------- Bedienung ---------- */
 function goto(view) {
   ui.view = view; meta.view = view; saveMeta();
-  if (view === 'fin' && !$('#finForm').elements.namedItem('date').value) $('#finForm').elements.namedItem('date').value = todayStr();
+  const dateIn = $('#finForm').elements.namedItem('date');
+  if (view === 'fin' && !dateIn.value) dateIn.value = todayStr();
   renderNav();
   window.scrollTo(0, 0);
 }
-function shiftMonth(key, delta) {
-  const [y, m] = ui[key].split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  ui[key] = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-}
+function shiftCalMonth(n) { ui.calMonth = addMonths(ui.calMonth, n); renderCal(); refreshCalendars(false); }
 
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]');
@@ -978,14 +1036,11 @@ document.addEventListener('click', async e => {
   const d = b.dataset;
   switch (d.act) {
     case 'goto': goto(d.view); if (d.focus) setTimeout(() => { const el = $(d.focus); if (el) el.focus(); }, 0); break;
-    case 'goto-google': ui.calMode = 'google'; goto('cal'); renderCal(); break;
-    case 'choose-folder': await chooseFolder(); break;
-    case 'reconnect': await reconnect(); break;
-    case 'pull': if (!(await pullFromFolder())) toast('Du hast bereits den neuesten Stand.'); break;
-    case 'export': if (canShareFiles()) await shareExport(); else downloadExport(); break;
-    case 'share': await shareExport(); break;
-    case 'download': downloadExport(); break;
+    case 'signin': signIn(); break;
+    case 'signout': if (confirm('Vom Google-Konto abmelden? Deine Daten bleiben auf diesem Gerät und in Google Drive erhalten.')) signOut(); break;
+    case 'sync': await syncData(); await refreshCalendars(true); break;
     case 'import': $('#importInput').click(); break;
+    case 'download': downloadExport(); break;
     case 'todo-filter': ui.todoFilter = d.f; renderTodos(); break;
     case 'todo-edit': editTodo(d.id); break;
     case 'todo-clear-done': {
@@ -993,50 +1048,36 @@ document.addEventListener('click', async e => {
       if (n && confirm(`${n} erledigte ${n === 1 ? 'Aufgabe' : 'Aufgaben'} endgültig löschen?`)) { data.todos = data.todos.filter(x => !x.done); commit(); }
       break;
     }
-    case 'cal-mode': ui.calMode = d.m; renderCal(); break;
-    case 'cal-prev': shiftMonth('calMonth', -1); renderCal(); break;
-    case 'cal-next': shiftMonth('calMonth', 1); renderCal(); break;
-    case 'cal-today': ui.calMonth = todayStr().slice(0, 7); ui.calDay = todayStr(); renderCal(); break;
-    case 'cal-day': ui.calDay = d.d; ui.calMonth = d.d.slice(0, 7); renderCal(); break;
+    case 'cal-prev': shiftCalMonth(-1); break;
+    case 'cal-next': shiftCalMonth(1); break;
+    case 'cal-today': ui.calDay = todayStr(); ui.calMonth = ui.calDay.slice(0, 7); renderCal(); refreshCalendars(false); break;
+    case 'cal-day': ui.calDay = d.d; if (d.d.slice(0, 7) !== ui.calMonth) { ui.calMonth = d.d.slice(0, 7); refreshCalendars(false); } renderCal(); break;
+    case 'cal-refresh': if (signedIn()) refreshCalendars(true); else signIn(); break;
     case 'event-new': editEvent(null, ui.calDay); break;
     case 'event-edit': editEvent(d.id); break;
-    case 'fin-prev': shiftMonth('finMonth', -1); renderFin(); break;
-    case 'fin-next': shiftMonth('finMonth', 1); renderFin(); break;
+    case 'gevent-open': if (d.link) window.open(d.link, '_blank', 'noopener'); break;
+    case 'fin-prev': ui.finMonth = addMonths(ui.finMonth, -1); renderFin(); break;
+    case 'fin-next': ui.finMonth = addMonths(ui.finMonth, 1); renderFin(); break;
     case 'fin-type': ui.finType = d.t; renderFin(); break;
     case 'fin-edit': editFin(d.id); break;
-    case 'gcal-add': {
-      const ids = gcalIdsFrom($('#gcalInput').value);
-      if (!ids.length) { toast('Keine Kalender-ID gefunden. Eine Kalender-ID enthält ein @, zum Beispiel …@group.calendar.google.com.'); break; }
-      const g = data.settings.gcals;
-      let added = 0;
-      for (const id of ids) if (!g.some(c => c.id === id)) { g.push(newGcal(id, g.length)); added++; }
-      $('#gcalInput').value = '';
-      if (added) { commit(); toast(added === 1 ? '1 Kalender hinzugefügt' : added + ' Kalender hinzugefügt'); }
-      else toast('Diese Kalender sind schon eingebunden.');
-      break;
-    }
-    case 'gcal-del': {
-      const g = data.settings.gcals, c = g[+d.i];
-      if (c && confirm(`„${c.name}“ aus dem Dashboard entfernen? In Google bleibt der Kalender erhalten.`)) { g.splice(+d.i, 1); commit(); }
-      break;
-    }
-    case 'gcal-mode': data.settings.gcalMode = d.m; commit(); break;
   }
 });
 
 document.addEventListener('change', e => {
   const ds = e.target.dataset || {};
-  const g = data.settings.gcals;
-  if (ds.gcal !== undefined && g[+ds.gcal]) { g[+ds.gcal].on = e.target.checked; commit(); return; }
-  if (ds.gcalColor !== undefined && g[+ds.gcalColor]) { g[+ds.gcalColor].color = e.target.value; commit(); return; }
-  if (ds.gcalName !== undefined && g[+ds.gcalName]) { g[+ds.gcalName].name = e.target.value.trim() || g[+ds.gcalName].name; e.target.blur(); commit(); return; }
-  const id = ds.todo;
-  if (!id) return;
-  const t = data.todos.find(x => x.id === id);
-  if (!t) return;
-  t.done = e.target.checked;
-  t.doneAt = t.done ? new Date().toISOString() : null;
-  commit();
+  if (ds.vis) { data.settings[ds.vis] = e.target.checked; commit(); return; }
+  if (ds.gcal !== undefined) {
+    const c = data.settings.gcals[+ds.gcal];
+    if (c) { c.on = e.target.checked; commit(); if (c.on) refreshCalendars(false); }
+    return;
+  }
+  if (ds.todo) {
+    const t = data.todos.find(x => x.id === ds.todo);
+    if (!t) return;
+    t.done = e.target.checked;
+    t.doneAt = t.done ? new Date().toISOString() : null;
+    commit();
+  }
 });
 
 $('#importInput').addEventListener('change', e => {
@@ -1072,15 +1113,18 @@ $('#finForm').addEventListener('submit', e => {
   el('desc').focus();
 });
 
-let lastPull = 0;
-function checkForNewer() {
-  if (Date.now() - lastPull < 3000) return;
-  lastPull = Date.now();
-  if (sync.ready) pullFromFolder();
+/* Beim Zurückkehren zur App: neuesten Stand holen */
+let lastCheck = 0;
+function onReturn() {
+  renderHome(); renderStatus();
+  if (Date.now() - lastCheck < 5000) return;
+  lastCheck = Date.now();
+  if (signedIn()) { syncData().then(() => refreshCalendars(false)); }
 }
-window.addEventListener('focus', () => { checkForNewer(); renderHome(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkForNewer(); renderHome(); } });
-window.addEventListener('beforeunload', e => { if (sync.pending) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('focus', onReturn);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onReturn(); });
+window.addEventListener('online', () => { if (signedIn()) syncData(); });
+window.addEventListener('beforeunload', e => { if (meta.dirty && signedIn()) { e.preventDefault(); e.returnValue = ''; } });
 
 let toastTimer;
 function toast(msg) {
@@ -1088,13 +1132,16 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
 /* ---------- Start ---------- */
 $('#finForm').elements.namedItem('date').value = todayStr();
 render();
-initFolder();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if (signedIn()) { syncData().then(() => refreshCalendars(false)); }
+window.onGisLoad = () => initGis();
 </script>
+<script src="https://accounts.google.com/gsi/client" async onload="onGisLoad()"></script>
 </body>
 </html>
