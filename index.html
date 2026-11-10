@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8B%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#EEF1EC; --surface:#FFFFFF; --surface-2:#E3E8E1; --ink:#1D2433; --muted:#5E6676; --line:#D3D9D0;
+  --accent:#2E6E62; --accent-ink:#FFFFFF; --accent-soft:#D6E7E2;
+  --warn:#B7791F; --danger:#B0412F; --income:#2E6E62; --expense:#B0412F;
+  --event:#3B5BA5; --event-soft:#DCE3F4;
+  --radius:10px;
+  font-family:"Segoe UI Variable Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --bg:#13171C; --surface:#1B2128; --surface-2:#252D35; --ink:#E5E9E3; --muted:#9AA3AE; --line:#2E3740;
+    --accent:#6DBBA9; --accent-ink:#0E1B18; --accent-soft:#1F3A35;
+    --warn:#E0A64A; --danger:#E58372; --income:#6DBBA9; --expense:#E58372;
+    --event:#9DB3EA; --event-soft:#26314A;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{line-height:1.2}
+
+/* Grundlayout */
+.app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+.nav{position:sticky;top:0;height:100vh;padding:20px 12px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line);background:var(--surface)}
+.brand{font-weight:700;font-size:17px;padding:4px 10px 18px;letter-spacing:-.01em}
+.nav button{display:flex;align-items:center;gap:10px;padding:9px 10px;border:0;background:none;color:var(--muted);font:inherit;border-radius:8px;cursor:pointer;text-align:left}
+.nav button svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button:hover{background:var(--surface-2);color:var(--ink)}
+.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.main-wrap{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 28px;display:flex;justify-content:flex-end;border-bottom:1px solid var(--line)}
+.sync{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);min-width:0}
+.sync span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.sync.ok::before{background:var(--accent)}
+.sync.warn::before{background:var(--warn)}
+.sync.err::before{background:var(--danger)}
+main{padding:28px;max-width:1100px;width:100%}
+
+/* Bedienelemente */
+.btn{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--danger);border-color:transparent;background:none}
+.btn.small{padding:5px 10px;font-size:13px}
+.btn.icon{padding:3px 11px;font-size:20px;line-height:1.1}
+.link{background:none;border:0;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;padding:2px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+textarea{resize:vertical}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:9px;padding:3px;gap:2px}
+.seg button{border:0;background:none;font:inherit;font-size:13px;padding:6px 12px;border-radius:7px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--line)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;min-width:0}
+.panel h2{font-size:15px;margin:0;font-weight:650}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px}
+.view-title{font-size:28px;letter-spacing:-.02em;margin:0 0 18px}
+.view-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+.view-head .view-title{margin:0}
+.muted{color:var(--muted);font-size:13.5px}
+.empty{color:var(--muted);margin:4px 0}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+
+/* Übersicht */
+.hero{margin:6px 0 30px}
+.hero-day{margin:0;color:var(--accent);font-weight:600;font-size:17px}
+.hero h1{margin:2px 0 10px;font-size:clamp(40px,7.5vw,76px);line-height:.98;letter-spacing:-.04em;font-weight:700}
+.hero-sum{margin:0;color:var(--muted);font-size:16px;max-width:60ch}
+.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;align-items:start}
+.mini{list-style:none;margin:0;padding:0}
+.mini-row{display:flex;gap:12px;width:100%;padding:8px 0;border:0;border-top:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.mini li:first-child .mini-row{border-top:0}
+.mini-row .when{width:96px;flex:none;color:var(--muted);font-size:13px;padding-top:1px}
+.mini-row .what{flex:1;min-width:0;overflow-wrap:anywhere}
+.money{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:15px}
+.money .total{border-top:1px solid var(--line);padding-top:6px;font-weight:650}
+
+/* Aufgaben */
+.addbar{display:flex;gap:8px;margin-bottom:16px}
+.addbar input[name=text]{flex:1}
+.addbar input[type=date]{width:auto}
+.todo-tools{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.group-label{font-size:13px;font-weight:600;color:var(--muted);margin:18px 0 6px}
+.group-label.over{color:var(--danger)}
+ul.todos{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.panel ul.todos{border:0;background:none}
+.todo{display:flex;align-items:center;gap:10px;padding:6px 12px;border-top:1px solid var(--line)}
+.panel .todo{padding:6px 0}
+.todo:first-child{border-top:0}
+.check{position:relative;display:inline-flex;cursor:pointer;flex:none}
+.check input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;width:100%}
+.check .box{width:20px;height:20px;border:2px solid var(--muted);border-radius:6px;display:inline-block;background-position:center;background-size:16px;background-repeat:no-repeat}
+.check input:checked + .box{background-color:var(--accent);border-color:var(--accent);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.5l3.2 3L15 7' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+.check input:focus-visible + .box{outline:2px solid var(--accent);outline-offset:2px}
+.todo-main{flex:1;min-width:0;text-align:left;background:none;border:0;font:inherit;color:inherit;padding:5px 0;cursor:pointer;display:flex;flex-direction:column}
+.todo-title{overflow-wrap:anywhere}
+.todo-note{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.todo.done .todo-title{text-decoration:line-through;color:var(--muted)}
+.chip{font-size:12.5px;padding:2px 8px;border-radius:20px;background:var(--surface-2);color:var(--muted);white-space:nowrap;flex:none}
+.todo.overdue .chip{background:color-mix(in srgb,var(--danger) 15%,transparent);color:var(--danger)}
+
+/* Kalender */
+.monthbar{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.monthbar h2{font-size:18px;margin:0 4px;min-width:150px;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--line);gap:1px}
+.cal-wd{background:var(--surface-2);font-size:12px;color:var(--muted);text-align:center;padding:6px 0;font-weight:600}
+.cal-cell{background:var(--surface);min-height:98px;border:0;font:inherit;color:inherit;text-align:left;padding:6px;display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:0}
+.cal-cell:hover{background:var(--surface-2)}
+.cal-cell.out{background:var(--bg);color:var(--muted)}
+.cal-cell .dnum{font-size:13px;font-weight:600;width:24px;height:24px;display:inline-grid;place-items:center;border-radius:50%}
+.cal-cell.today .dnum{background:var(--accent);color:var(--accent-ink)}
+.cal-cell.sel{box-shadow:inset 0 0 0 2px var(--accent)}
+.items{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ci{font-size:11.5px;line-height:1.35;padding:1px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci.ev{background:var(--event-soft);color:var(--event)}
+.ci.td{box-shadow:inset 0 0 0 1px var(--line);color:var(--muted)}
+.ci.more{color:var(--muted);padding-left:2px}
+.day-panel{margin-top:16px}
+.gcal-bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.gcal-toggles{display:flex;flex-wrap:wrap;gap:6px}
+.gtog{position:relative;display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 9px;border:1px solid var(--line);border-radius:20px;background:var(--surface);font-size:13.5px;cursor:pointer;user-select:none}
+.gtog input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.gtog .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.gtog:has(input:not(:checked)){color:var(--muted);background:none;border-style:dashed}
+.gtog:has(input:not(:checked)) .dot{background:transparent !important;box-shadow:inset 0 0 0 2px var(--muted)}
+.gtog:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.gcal-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:8px;align-items:center;margin:8px 0}
+.gcal-row input[type=color]{width:44px;height:38px;padding:3px;cursor:pointer}
+.gcal-row .show{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;white-space:nowrap;cursor:pointer}
+.gcal-row .show input{width:auto;margin:0}
+#gcalInput{margin-top:8px}
+.gcal-wrap iframe{width:100%;height:min(75vh,720px);border:1px solid var(--line);border-radius:var(--radius);background:#fff;display:block}
+
+/* Finanzen */
+.fin-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;min-width:0}
+.stat span{font-size:13px;color:var(--muted)}
+.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat.in b{color:var(--income)}
+.stat.out b{color:var(--expense)}
+.fin-form{display:grid;grid-template-columns:auto 150px minmax(0,1fr) 160px 120px auto;gap:8px;align-items:center;margin-bottom:16px}
+.fin-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:16px;align-items:start}
+.fin-cols .panel h2{margin-bottom:8px}
+.bar-row{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin:10px 0;font-size:14px}
+.bar{grid-column:1/-1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--expense);border-radius:3px}
+.amt{font-variant-numeric:tabular-nums;white-space:nowrap}
+.amt.in{color:var(--income)}
+.amt.out{color:var(--expense)}
+.fin-row{display:flex;align-items:center;gap:12px;padding:8px 0;border:0;border-top:1px solid var(--line);width:100%;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.fin-list > .fin-row:first-child{border-top:0}
+.fin-row .d{width:58px;color:var(--muted);font-size:13px;flex:none}
+.fin-row .t{flex:1;min-width:0;overflow-wrap:anywhere}
+.fin-row .c{display:block;font-size:12.5px;color:var(--muted)}
+
+/* Einstellungen */
+#v-set .panel + .panel{margin-top:16px}
+#v-set p{max-width:70ch}
+#v-set h3{font-size:14px;margin:18px 0 4px}
+
+/* Dialog und Meldungen */
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);padding:20px;width:min(440px,calc(100vw - 32px))}
+dialog::backdrop{background:rgb(0 0 0 / .4)}
+dialog h2{margin:0 0 14px;font-size:18px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field label{font-size:13px;color:var(--muted);font-weight:600}
+.dlg-actions{display:flex;gap:8px;align-items:center;margin-top:6px}
+.spacer{flex:1}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;transition:opacity .2s,transform .2s;pointer-events:none;z-index:50;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+
+/* Tablet und Handy */
+@media (max-width:900px){
+  .fin-form{grid-template-columns:1fr 1fr}
+  .fin-form .seg,.fin-form [name=desc],.fin-form .btn{grid-column:1/-1}
+  .fin-form .seg{justify-self:start}
+  .fin-cols{grid-template-columns:1fr}
+}
+@media (max-width:800px){
+  .app{grid-template-columns:1fr}
+  .nav{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--line);z-index:10}
+  .brand{display:none}
+  .nav button{flex:1;flex-direction:column;gap:3px;font-size:10.5px;padding:6px 2px;align-items:center;text-align:center}
+  .topbar{padding:8px 16px;padding-top:calc(8px + env(safe-area-inset-top,0px));justify-content:flex-start}
+  main{padding:18px 16px 100px}
+  .toast{bottom:88px}
+}
+@media (max-width:640px){
+  .addbar{flex-wrap:wrap}
+  .addbar input[name=text]{flex-basis:100%}
+  .addbar input[type=date]{flex:1}
+  .cal-cell{min-height:56px;padding:4px 2px;align-items:center}
+  .items{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:3px}
+  .ci{font-size:0;width:6px;height:6px;padding:0;border-radius:50%}
+  .ci.ev{background:var(--event)}
+  .ci.td{background:var(--muted);box-shadow:none}
+  .ci.more{display:none}
+  .fin-sum{gap:8px}
+  .stat{padding:10px 12px}
+  .stat b{font-size:17px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Bereiche">
+    <div class="brand">Dashboard</div>
+    <button data-act="goto" data-view="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Übersicht</button>
+    <button data-act="goto" data-view="todos"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10M3.5 6l1.5 1.5L8 4.5M3.5 12l1.5 1.5L8 10.5M3.5 18l1.5 1.5L8 16.5"/></svg>Aufgaben</button>
+    <button data-act="goto" data-view="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Kalender</button>
+    <button data-act="goto" data-view="fin"><svg viewBox="0 0 24 24"><path d="M18 6.5A7 7 0 1 0 18 17.5M4 10h10M4 14h10"/></svg>Finanzen</button>
+    <button data-act="goto" data-view="set"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Einstellungen</button>
+  </nav>
+
+  <div class="main-wrap">
+    <header class="topbar"><div id="syncStatus" class="sync" role="status"></div></header>
+    <main>
+
+      <section id="v-home" class="view">
+        <div class="hero">
+          <p class="hero-day" id="heroDay"></p>
+          <h1 id="heroDate"></h1>
+          <p class="hero-sum" id="heroSum"></p>
+        </div>
+        <div class="home-grid">
+          <section class="panel">
+            <div class="panel-head"><h2>Fällig in den nächsten 7 Tagen</h2><button class="link" data-act="goto" data-view="todos">Alle Aufgaben</button></div>
+            <div id="homeTodos"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Nächste Termine</h2><button class="link" data-act="goto" data-view="cal">Kalender</button></div>
+            <div id="homeEvents"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2 id="homeFinTitle">Finanzen</h2><button class="link" data-act="goto" data-view="fin">Details</button></div>
+            <div id="homeFin"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="v-todos" class="view" hidden>
+        <h1 class="view-title">Aufgaben</h1>
+        <form id="todoForm" class="addbar" autocomplete="off">
+          <input name="text" required placeholder="Neue Aufgabe" aria-label="Neue Aufgabe">
+          <input name="due" type="date" aria-label="Fällig am">
+          <button class="btn primary">Hinzufügen</button>
+        </form>
+        <div class="todo-tools">
+          <div class="seg" id="todoFilter">
+            <button type="button" data-act="todo-filter" data-f="offen">Offen</button>
+            <button type="button" data-act="todo-filter" data-f="erledigt">Erledigt</button>
+            <button type="button" data-act="todo-filter" data-f="alle">Alle</button>
+          </div>
+          <button type="button" class="btn small" id="clearDone" data-act="todo-clear-done" hidden>Erledigte löschen</button>
+        </div>
+        <div id="todoList"></div>
+      </section>
+
+      <section id="v-cal" class="view" hidden>
+        <div class="view-head">
+          <h1 class="view-title">Kalender</h1>
+          <div class="seg" id="calMode">
+            <button type="button" data-act="cal-mode" data-m="own">Mein Kalender</button>
+            <button type="button" data-act="cal-mode" data-m="google">Google Kalender</button>
+          </div>
+        </div>
+        <div id="calOwn">
+          <div class="monthbar">
+            <button class="btn icon" data-act="cal-prev" aria-label="Voriger Monat">‹</button>
+            <h2 id="calTitle"></h2>
+            <button class="btn icon" data-act="cal-next" aria-label="Nächster Monat">›</button>
+            <button class="btn small" data-act="cal-today">Heute</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+          <section class="panel day-panel">
+            <div class="panel-head"><h2 id="dayTitle"></h2><button class="btn small primary" data-act="event-new">Termin hinzufügen</button></div>
+            <div id="dayList"></div>
+          </section>
+        </div>
+        <div id="calGoogle" hidden></div>
+      </section>
+
+      <section id="v-fin" class="view" hidden>
+        <div class="view-head">
+          <h1 class="view-title">Finanzen</h1>
+          <div class="monthbar" style="margin:0">
+            <button class="btn icon" data-act="fin-prev" aria-label="Voriger Monat">‹</button>
+            <h2 id="finTitle"></h2>
+            <button class="btn icon" data-act="fin-next" aria-label="Nächster Monat">›</button>
+          </div>
+        </div>
+        <div class="fin-sum" id="finSum"></div>
+        <form id="finForm" class="panel fin-form" autocomplete="off">
+          <div class="seg" id="finType">
+            <button type="button" data-act="fin-type" data-t="ausgabe">Ausgabe</button>
+            <button type="button" data-act="fin-type" data-t="einnahme">Einnahme</button>
+          </div>
+          <input name="date" type="date" required aria-label="Datum">
+          <input name="desc" required placeholder="Beschreibung" aria-label="Beschreibung">
+          <input name="cat" list="catList" placeholder="Kategorie" aria-label="Kategorie">
+          <input name="amount" required inputmode="decimal" placeholder="Betrag in €" aria-label="Betrag in Euro">
+          <button class="btn primary">Buchen</button>
+        </form>
+        <datalist id="catList"></datalist>
+        <div class="fin-cols">
+          <section class="panel"><h2>Ausgaben nach Kategorie</h2><div id="finCats"></div></section>
+          <section class="panel"><h2>Buchungen</h2><div id="finList" class="fin-list"></div></section>
+        </div>
+      </section>
+
+      <section id="v-set" class="view" hidden>
+        <h1 class="view-title">Einstellungen</h1>
+        <section class="panel"><h2>Synchronisation</h2><div id="setSync"></div></section>
+        <section class="panel">
+          <h2>Google Kalender</h2>
+          <p class="muted">Füge jeden Kalender einzeln hinzu: Öffne Google Kalender am PC im Browser, gehe zu Einstellungen, wähle links den Kalender und kopiere unter „Kalender integrieren“ die Kalender-ID. Der komplette „Code zum Einbetten“ funktioniert auch, ebenso einer mit mehreren Kalendern. Private Termine sind nur sichtbar, wenn du im selben Browser bei Google angemeldet bist.</p>
+          <div id="gcalList"></div>
+          <textarea id="gcalInput" rows="2" placeholder="Kalender-ID oder Einbettungscode einfügen"></textarea>
+          <div class="row"><button class="btn primary" data-act="gcal-add">Kalender hinzufügen</button></div>
+        </section>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <form id="dlgForm" autocomplete="off">
+    <h2 id="dlgTitle"></h2>
+    <div id="dlgBody"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="dlgDelete">Löschen</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="dlgCancel">Abbrechen</button>
+      <button class="btn primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<input type="file" id="importInput" accept=".json,application/json" hidden>
+
+<script>
+'use strict';
+
+/* ---------- Grundlagen ---------- */
+const KEEP_FILES = 10;                       // so viele Versionen bleiben im OneDrive-Ordner
+const LS_DATA = 'dashboard.daten';
+const LS_META = 'dashboard.meta';
+const FS = typeof window.showDirectoryPicker === 'function';
+const DEFAULT_CATS = ['Wohnen','Lebensmittel','Auto','Versicherungen','Freizeit','Gesundheit','Gehalt','Sonstiges'];
+const FILE_RE = /^dashboard_.*\.json$/i;
+const OWN_RE = /^dashboard_\d{4}-\d{2}-\d{2}_\d{6}\.json$/;
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const todayStr = () => ymd(new Date());
+const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
+const stamp = () => { const d = new Date(); return `${ymd(d)}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`; };
+const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+const num2 = n => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDateTime = iso => iso ? new Date(iso).toLocaleString('de-DE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'noch nichts gespeichert';
+const fmtTime = iso => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+const monthName = ym => parseYmd(ym + '-01').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+const count = (c, one, many) => `${c === 0 ? 'keine' : c} ${c === 1 ? one : many}`;
+
+function dueLabel(s) {
+  const t = todayStr();
+  if (s === t) return 'Heute';
+  if (s === addDays(t, 1)) return 'Morgen';
+  if (s === addDays(t, -1)) return 'Gestern';
+  const d = parseYmd(s);
+  const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('de-DE', opts);
+}
+
+function parseAmount(s) {
+  s = String(s ?? '').trim().replace(/[\s€]/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  const n = Number(s);
+  return isFinite(n) && s !== '' ? Math.round(n * 100) / 100 : NaN;
+}
+
+/* ---------- Google Kalender ---------- */
+const GCAL_COLORS = ['#039BE5', '#33B679', '#8E24AA', '#E67C73', '#F6BF26', '#F4511E', '#7986CB', '#616161'];
+function gcalIdsFrom(input) {
+  input = (input || '').trim();
+  if (!input) return [];
+  const m = input.match(/src\s*=\s*["']([^"']+)["']/i);
+  const s = (m ? m[1] : input).replace(/&amp;/g, '&');
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      if (!/(^|\.)google\.com$/i.test(u.hostname)) return [];
+      const ids = u.searchParams.getAll('src');
+      const cid = u.searchParams.get('cid');
+      if (cid) { try { ids.push(cid.includes('@') ? cid : atob(cid)); } catch {} }
+      return [...new Set(ids.filter(x => x.includes('@')))];
+    } catch { return []; }
+  }
+  return [...new Set(s.split(/[\s,;]+/).filter(x => x.includes('@')))];
+}
+function newGcal(id, i) {
+  let name = 'Kalender ' + (i + 1);
+  if (id.includes('#holiday')) name = 'Feiertage';
+  else if (id.includes('#contacts')) name = 'Geburtstage';
+  else if (/@(gmail|googlemail)\.com$/i.test(id)) name = 'Hauptkalender';
+  return { id, name, color: GCAL_COLORS[i % GCAL_COLORS.length], on: true };
+}
+function gcalUrl() {
+  const s = data.settings;
+  const vis = s.gcals.filter(c => c.on);
+  if (!vis.length) return '';
+  const p = ['wkst=2', 'hl=de', 'ctz=Europe%2FBerlin', 'showTitle=0', 'showPrint=0', 'showCalendars=0', 'showTz=0', 'mode=' + s.gcalMode];
+  for (const c of vis) p.push('src=' + encodeURIComponent(c.id), 'color=' + encodeURIComponent(c.color));
+  return 'https://calendar.google.com/calendar/embed?' + p.join('&');
+}
+
+/* ---------- Daten ---------- */
+function emptyData() {
+  return { app: 'dashboard', version: 1, updatedAt: null, todos: [], events: [], finance: [],
+           settings: { gcals: [], gcalMode: 'MONTH', categories: [...DEFAULT_CATS] } };
+}
+function normalize(d) {
+  const e = emptyData();
+  if (!d || typeof d !== 'object') return e;
+  const s = Object.assign(e.settings, d.settings || {});
+  if (!Array.isArray(s.categories)) s.categories = [...DEFAULT_CATS];
+  if (!Array.isArray(s.gcals)) s.gcals = [];
+  if (s.gcalSrc) {                                   // ältere Version mit nur einem Kalender übernehmen
+    for (const id of gcalIdsFrom(s.gcalSrc)) if (!s.gcals.some(c => c.id === id)) s.gcals.push(newGcal(id, s.gcals.length));
+    delete s.gcalSrc;
+  }
+  if (!['MONTH', 'WEEK', 'AGENDA'].includes(s.gcalMode)) s.gcalMode = 'MONTH';
+  return { app: 'dashboard', version: 1, updatedAt: d.updatedAt || null,
+           todos: Array.isArray(d.todos) ? d.todos : [],
+           events: Array.isArray(d.events) ? d.events : [],
+           finance: Array.isArray(d.finance) ? d.finance : [],
+           settings: s };
+}
+function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LS_DATA))); } catch { return emptyData(); } }
+function saveLocal() { try { localStorage.setItem(LS_DATA, JSON.stringify(data)); } catch (e) { toast('Speichern im Browser fehlgeschlagen: ' + e.message); } }
+function loadMeta() { try { return JSON.parse(localStorage.getItem(LS_META)) || {}; } catch { return {}; } }
+function saveMeta() { try { localStorage.setItem(LS_META, JSON.stringify(meta)); } catch {} }
+const hasContent = d => d.todos.length || d.events.length || d.finance.length;
+
+let data = loadLocal();
+let meta = loadMeta();
+const ui = { view: meta.view || 'home', todoFilter: 'offen', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+             calMode: 'own', finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
+
+function commit() {
+  data.updatedAt = new Date().toISOString();
+  saveLocal();
+  scheduleFileSave();
+  render();
+}
+function replaceData(d) {
+  data = normalize(d);
+  saveLocal();
+  const dlg = $('#dlg'); if (dlg.open) dlg.close();
+  render();
+}
+
+/* ---------- Ordner-Zugriff (PC: Edge/Chrome) ---------- */
+function idb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('dashboard', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbGet(k) {
+  const db = await idb();
+  return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+}
+async function idbSet(k, v) {
+  const db = await idb();
+  return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(); t.onerror = () => rej(t.error); });
+}
+
+const sync = { dir: null, ready: false, needsPermission: false, fileName: null, lastSaved: null, error: null, timer: null, pending: false, busy: false };
+
+async function initFolder() {
+  if (!FS) return;
+  try { sync.dir = (await idbGet('ordner')) || null; } catch { sync.dir = null; }
+  if (sync.dir) {
+    try {
+      const p = await sync.dir.queryPermission({ mode: 'readwrite' });
+      if (p === 'granted') { sync.ready = true; await pullFromFolder(); }
+      else sync.needsPermission = true;
+    } catch (e) { sync.error = e.message; }
+  }
+  renderStatus(); renderSettings();
+}
+
+async function chooseFolder() {
+  try {
+    const dir = await window.showDirectoryPicker({ id: 'dashboard', mode: 'readwrite' });
+    Object.assign(sync, { dir, ready: true, needsPermission: false, fileName: null, error: null });
+    try { await idbSet('ordner', dir); } catch {}
+    const loaded = await pullFromFolder();
+    if (!loaded) toast('Ordner „' + dir.name + '“ verbunden');
+  } catch (e) {
+    if (e.name !== 'AbortError') { sync.error = e.message; toast('Ordner konnte nicht verbunden werden: ' + e.message); }
+  }
+  render();
+}
+
+async function reconnect() {
+  if (!sync.dir) return chooseFolder();
+  try {
+    const p = await sync.dir.requestPermission({ mode: 'readwrite' });
+    if (p === 'granted') { Object.assign(sync, { ready: true, needsPermission: false, error: null }); await pullFromFolder(); }
+  } catch (e) { sync.error = e.message; }
+  render();
+}
+
+async function scanFolder() {
+  const out = [];
+  for await (const [name, h] of sync.dir.entries()) {
+    if (h.kind !== 'file' || !FILE_RE.test(name)) continue;
+    try {
+      const j = JSON.parse(await (await h.getFile()).text());
+      if (j && j.app === 'dashboard') out.push({ name, updatedAt: j.updatedAt || '', data: j });
+    } catch { /* unlesbare Datei überspringen */ }
+  }
+  out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return out;
+}
+
+/* Lädt die neueste Datei, falls sie neuer ist als der Stand im Browser. Gibt true zurück, wenn geladen wurde. */
+async function pullFromFolder() {
+  if (!sync.ready || sync.busy) return false;
+  sync.busy = true;
+  let loaded = false;
+  try {
+    const files = await scanFolder();
+    const newest = files[0];
+    if (newest && (!data.updatedAt || newest.updatedAt > data.updatedAt)) {
+      replaceData(newest.data);
+      loaded = true;
+      toast('Neuester Stand geladen (' + fmtDateTime(newest.updatedAt) + ')');
+    } else if (hasContent(data) && (!newest || data.updatedAt > newest.updatedAt)) {
+      await writeToFolder();
+    }
+    sync.error = null;
+  } catch (e) {
+    sync.error = e.message;
+    if (e.name === 'NotAllowedError') { sync.ready = false; sync.needsPermission = true; }
+  } finally {
+    sync.busy = false;
+    renderStatus();
+  }
+  return loaded;
+}
+
+async function writeToFolder() {
+  if (!sync.ready) return;
+  if (!sync.fileName) sync.fileName = `dashboard_${stamp()}.json`;
+  const fh = await sync.dir.getFileHandle(sync.fileName, { create: true });
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify(data, null, 2));
+  await w.close();
+  sync.lastSaved = new Date().toISOString();
+  await prune();
+}
+
+async function prune() {
+  const names = [];
+  for await (const [name, h] of sync.dir.entries()) if (h.kind === 'file' && OWN_RE.test(name)) names.push(name);
+  names.sort().reverse();
+  for (const n of names.slice(KEEP_FILES)) {
+    if (n === sync.fileName) continue;
+    try { await sync.dir.removeEntry(n); } catch {}
+  }
+}
+
+function scheduleFileSave() {
+  if (!sync.ready) { renderStatus(); return; }
+  sync.pending = true;
+  renderStatus();
+  clearTimeout(sync.timer);
+  sync.timer = setTimeout(async () => {
+    try { await writeToFolder(); sync.error = null; }
+    catch (e) {
+      sync.error = e.message;
+      if (e.name === 'NotAllowedError') { sync.ready = false; sync.needsPermission = true; }
+    }
+    sync.pending = false;
+    renderStatus();
+  }, 1000);
+}
+
+/* ---------- Export / Import (Handy, Tablet, Backup) ---------- */
+function exportPayload() {
+  const name = `dashboard_${stamp()}.json`;
+  return { name, blob: new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }) };
+}
+function canShareFiles() {
+  try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 't.json', { type: 'application/json' })] })); }
+  catch { return false; }
+}
+function markExported() { meta.lastExportedAt = data.updatedAt || ''; saveMeta(); renderStatus(); renderSettings(); }
+async function shareExport() {
+  const { name, blob } = exportPayload();
+  try {
+    await navigator.share({ files: [new File([blob], name, { type: 'application/json' })], title: 'Dashboard-Daten' });
+    markExported();
+    toast('Datei ' + name + ' geteilt');
+  } catch (e) {
+    if (e.name !== 'AbortError') { toast('Teilen nicht möglich, die Datei wird heruntergeladen.'); downloadExport(); }
+  }
+}
+function downloadExport() {
+  const { name, blob } = exportPayload();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  markExported();
+  toast('Heruntergeladen als ' + name);
+}
+async function importFile(file) {
+  try {
+    const j = JSON.parse(await file.text());
+    if (!j || j.app !== 'dashboard') throw new Error('Das ist keine Dashboard-Datei.');
+    let older = false;
+    if (data.updatedAt && j.updatedAt && j.updatedAt < data.updatedAt) {
+      if (!confirm(`Die Datei ist älter (${fmtDateTime(j.updatedAt)}) als der Stand auf diesem Gerät (${fmtDateTime(data.updatedAt)}). Trotzdem laden?`)) return;
+      older = true;
+    }
+    replaceData(j);
+    if (older) { data.updatedAt = new Date().toISOString(); saveLocal(); }
+    meta.lastExportedAt = data.updatedAt; saveMeta();
+    if (sync.ready) await writeToFolder();
+    render();
+    toast('Daten geladen (Stand ' + fmtDateTime(data.updatedAt) + ')');
+  } catch (e) { toast('Import fehlgeschlagen: ' + e.message); }
+}
+
+/* ---------- Anzeige ---------- */
+function render() { renderNav(); renderStatus(); renderHome(); renderTodos(); renderCal(); renderFin(); renderSettings(); }
+
+function renderNav() {
+  $$('.nav [data-view]').forEach(b => b.setAttribute('aria-current', b.dataset.view === ui.view ? 'page' : 'false'));
+  $$('.view').forEach(v => { v.hidden = v.id !== 'v-' + ui.view; });
+}
+
+function renderStatus() {
+  const el = $('#syncStatus');
+  let html = '', cls = '';
+  if (FS) {
+    if (!sync.dir) { html = '<span>Kein OneDrive-Ordner verbunden</span><button class="btn small" data-act="choose-folder">Ordner wählen</button>'; cls = 'warn'; }
+    else if (sync.needsPermission || !sync.ready) { html = `<span>Zugriff auf „${esc(sync.dir.name)}“ bestätigen</span><button class="btn small primary" data-act="reconnect">Verbinden</button>`; cls = 'warn'; }
+    else if (sync.error) { html = `<span>Speichern fehlgeschlagen: ${esc(sync.error)}</span><button class="btn small" data-act="reconnect">Erneut versuchen</button>`; cls = 'err'; }
+    else if (sync.pending) { html = '<span>Speichert …</span>'; }
+    else { html = `<span>OneDrive-Ordner „${esc(sync.dir.name)}“${sync.lastSaved ? ', gespeichert um ' + fmtTime(sync.lastSaved) : ', aktuell'}</span>`; cls = 'ok'; }
+  } else {
+    const unexported = data.updatedAt && data.updatedAt > (meta.lastExportedAt || '');
+    if (!data.updatedAt) { html = '<span>Neueste Datei aus OneDrive laden</span><button class="btn small" data-act="import">Importieren</button>'; cls = 'warn'; }
+    else if (unexported) { html = '<span>Änderungen noch nicht in OneDrive</span><button class="btn small primary" data-act="export">Exportieren</button>'; cls = 'warn'; }
+    else { html = '<span>Stand ist exportiert</span><button class="btn small" data-act="import">Importieren</button>'; cls = 'ok'; }
+  }
+  el.className = 'sync ' + cls;
+  el.innerHTML = html;
+}
+
+function todoItem(x) {
+  const over = !x.done && x.due && x.due < todayStr();
+  return `<li class="todo${x.done ? ' done' : ''}${over ? ' overdue' : ''}">
+    <label class="check"><input type="checkbox" data-todo="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="Erledigt: ${esc(x.title)}"><span class="box"></span></label>
+    <button class="todo-main" data-act="todo-edit" data-id="${esc(x.id)}"><span class="todo-title">${esc(x.title)}</span>${x.note ? `<span class="todo-note">${esc(x.note)}</span>` : ''}</button>
+    ${x.due ? `<span class="chip">${esc(dueLabel(x.due))}</span>` : ''}
+  </li>`;
+}
+const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.created || '').localeCompare(b.created || '');
+const byWhen = (a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99');
+
+function renderHome() {
+  const t = todayStr(), now = new Date();
+  $('#heroDay').textContent = now.toLocaleDateString('de-DE', { weekday: 'long' });
+  $('#heroDate').textContent = now.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+  const open = data.todos.filter(x => !x.done);
+  const over = open.filter(x => x.due && x.due < t).length;
+  const dueToday = open.filter(x => x.due === t).length;
+  const evToday = data.events.filter(e => e.date === t).length;
+  let sum = `Heute ${count(dueToday, 'Aufgabe', 'Aufgaben')} und ${count(evToday, 'Termin', 'Termine')}.`;
+  if (over) sum += ` ${over} ${over === 1 ? 'Aufgabe ist' : 'Aufgaben sind'} überfällig.`;
+  $('#heroSum').textContent = sum;
+
+  const soon = open.filter(x => x.due && x.due <= addDays(t, 7)).sort(byDue);
+  $('#homeTodos').innerHTML = soon.length
+    ? `<ul class="todos">${soon.slice(0, 8).map(todoItem).join('')}</ul>${soon.length > 8 ? `<p class="muted">und ${soon.length - 8} weitere</p>` : ''}`
+    : `<p class="empty">Nichts fällig.</p><div class="row"><button class="btn small" data-act="goto" data-view="todos" data-focus="#todoForm [name=text]">Aufgabe anlegen</button></div>`;
+
+  const evs = data.events.filter(e => e.date >= t && e.date <= addDays(t, 14)).sort(byWhen);
+  $('#homeEvents').innerHTML = (evs.length
+    ? `<ul class="mini">${evs.slice(0, 6).map(e => `<li><button class="mini-row" data-act="event-edit" data-id="${esc(e.id)}"><span class="when">${esc(dueLabel(e.date))}${e.time ? '<br>' + esc(e.time) : ''}</span><span class="what">${esc(e.title)}</span></button></li>`).join('')}</ul>`
+    : '<p class="empty">Keine Termine in den nächsten 14 Tagen.</p>')
+    + (data.settings.gcals.length ? '<div class="row"><button class="btn small" data-act="goto-google">Google Kalender anzeigen</button></div>' : '');
+
+  const ym = t.slice(0, 7);
+  const s = finSums(ym);
+  $('#homeFinTitle').textContent = 'Finanzen im ' + parseYmd(ym + '-01').toLocaleDateString('de-DE', { month: 'long' });
+  $('#homeFin').innerHTML = s.n
+    ? `<div class="money"><span>Einnahmen</span><span class="amt in">${eur.format(s.inc)}</span><span>Ausgaben</span><span class="amt out">${eur.format(s.exp)}</span><span class="total">Saldo</span><span class="total amt ${s.bal < 0 ? 'out' : 'in'}">${eur.format(s.bal)}</span></div>`
+    : `<p class="empty">Noch keine Buchungen in diesem Monat.</p><div class="row"><button class="btn small" data-act="goto" data-view="fin" data-focus="#finForm [name=desc]">Buchung erfassen</button></div>`;
+}
+
+function todoGroups(list) {
+  const t = todayStr(), tm = addDays(t, 1), wk = addDays(t, 7);
+  const g = [['Überfällig', []], ['Heute', []], ['Morgen', []], ['Nächste 7 Tage', []], ['Später', []], ['Ohne Datum', []]];
+  for (const x of list) {
+    const i = !x.due ? 5 : x.due < t ? 0 : x.due === t ? 1 : x.due === tm ? 2 : x.due <= wk ? 3 : 4;
+    g[i][1].push(x);
+  }
+  g.forEach(([, items]) => items.sort(byDue));
+  return g;
+}
+
+function renderTodos() {
+  const f = ui.todoFilter;
+  $$('#todoFilter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === f));
+  const open = data.todos.filter(x => !x.done);
+  const done = data.todos.filter(x => x.done).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+  $('#clearDone').hidden = !(f !== 'offen' && done.length);
+  let h = '';
+  if (f !== 'erledigt') {
+    for (const [label, items] of todoGroups(open))
+      if (items.length) h += `<h3 class="group-label${label === 'Überfällig' ? ' over' : ''}">${label}</h3><ul class="todos">${items.map(todoItem).join('')}</ul>`;
+  }
+  if (f !== 'offen' && done.length) h += `<h3 class="group-label">Erledigt</h3><ul class="todos">${done.map(todoItem).join('')}</ul>`;
+  if (!h) h = f === 'erledigt' ? '<p class="empty" style="margin-top:16px">Noch nichts erledigt.</p>' : '<p class="empty" style="margin-top:16px">Keine offenen Aufgaben. Trag oben die nächste ein.</p>';
+  $('#todoList').innerHTML = h;
+}
+
+function itemsOn(date) {
+  return {
+    evs: data.events.filter(e => e.date === date).sort(byWhen),
+    tds: data.todos.filter(x => !x.done && x.due === date)
+  };
+}
+
+function renderCal() {
+  const google = ui.calMode === 'google';
+  $$('#calMode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === ui.calMode));
+  $('#calOwn').hidden = google;
+  $('#calGoogle').hidden = !google;
+  if (google) { renderGoogle(); return; }
+
+  const [y, m] = ui.calMonth.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const offset = (first.getDay() + 6) % 7;
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const cells = Math.ceil((offset + daysInMonth) / 7) * 7;
+  const t = todayStr();
+  $('#calTitle').textContent = monthName(ui.calMonth);
+  let h = ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => `<div class="cal-wd">${d}</div>`).join('');
+  for (let i = 0; i < cells; i++) {
+    const d = new Date(y, m - 1, 1 - offset + i), ds = ymd(d);
+    const { evs, tds } = itemsOn(ds);
+    const all = [...evs.map(e => `<span class="ci ev">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`),
+                 ...tds.map(x => `<span class="ci td">${esc(x.title)}</span>`)];
+    const cls = ['cal-cell', d.getMonth() !== m - 1 ? 'out' : '', ds === t ? 'today' : '', ds === ui.calDay ? 'sel' : ''].join(' ');
+    const label = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (all.length ? `, ${all.length} Einträge` : '');
+    h += `<button class="${cls}" data-act="cal-day" data-d="${ds}" aria-label="${esc(label)}"><span class="dnum">${d.getDate()}</span><span class="items">${all.slice(0, 3).join('')}${all.length > 3 ? `<span class="ci more">+${all.length - 3}</span>` : ''}</span></button>`;
+  }
+  $('#calGrid').innerHTML = h;
+
+  $('#dayTitle').textContent = parseYmd(ui.calDay).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const { evs, tds } = itemsOn(ui.calDay);
+  let dl = '';
+  if (evs.length) dl += `<ul class="mini">${evs.map(e => `<li><button class="mini-row" data-act="event-edit" data-id="${esc(e.id)}"><span class="when">${e.time ? esc(e.time) : 'ganztägig'}</span><span class="what">${esc(e.title)}${e.note ? `<span class="todo-note" style="display:block">${esc(e.note)}</span>` : ''}</span></button></li>`).join('')}</ul>`;
+  if (tds.length) dl += `<h3 class="group-label">Aufgaben</h3><ul class="todos">${tds.map(todoItem).join('')}</ul>`;
+  $('#dayList').innerHTML = dl || '<p class="empty">Nichts geplant.</p>';
+}
+
+function renderGoogle() {
+  const st = data.settings, wrap = $('#calGoogle');
+  if (!st.gcals.length) {
+    wrap.dataset.built = '';
+    wrap.innerHTML = `<section class="panel"><p class="empty">Noch kein Google Kalender eingebunden.</p><div class="row"><button class="btn primary" data-act="goto" data-view="set">In den Einstellungen einbinden</button></div></section>`;
+    return;
+  }
+  if (wrap.dataset.built !== '1') {
+    wrap.dataset.built = '1';
+    wrap.innerHTML = `<div id="gcalCtrl"></div><div id="gcalFrame"></div>
+      <p class="muted">Nur Anzeige. Neue Google-Termine legst du direkt in Google Kalender an. <a href="https://calendar.google.com/" target="_blank" rel="noopener">Google Kalender öffnen</a></p>`;
+  }
+  $('#gcalCtrl').innerHTML = `<div class="gcal-bar">
+    <div class="gcal-toggles" role="group" aria-label="Kalender ein- und ausblenden">${st.gcals.map((c, i) =>
+      `<label class="gtog"><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</label>`).join('')}</div>
+    <div class="seg">${[['MONTH', 'Monat'], ['WEEK', 'Woche'], ['AGENDA', 'Liste']].map(([v, l]) =>
+      `<button type="button" data-act="gcal-mode" data-m="${v}" aria-pressed="${st.gcalMode === v}">${l}</button>`).join('')}</div>
+  </div>`;
+  const frame = $('#gcalFrame'), src = gcalUrl();
+  if (frame.dataset.src === src && frame.innerHTML) return;   // iframe nur bei Änderung neu laden
+  frame.dataset.src = src;
+  frame.innerHTML = src
+    ? `<div class="gcal-wrap"><iframe src="${esc(src)}" title="Google Kalender" loading="lazy"></iframe></div>`
+    : '<section class="panel"><p class="empty">Alle Kalender sind ausgeblendet. Tippe oben einen an, um ihn einzublenden.</p></section>';
+}
+
+function finSums(ym) {
+  let inc = 0, exp = 0, n = 0;
+  for (const f of data.finance) if (f.date && f.date.slice(0, 7) === ym) { n++; if (f.type === 'einnahme') inc += f.amount; else exp += f.amount; }
+  return { inc, exp, bal: inc - exp, n };
+}
+
+function renderFin() {
+  const ym = ui.finMonth;
+  $('#finTitle').textContent = monthName(ym);
+  $$('#finType button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === ui.finType));
+  const s = finSums(ym);
+  $('#finSum').innerHTML = `
+    <div class="stat in"><span>Einnahmen</span><b>${eur.format(s.inc)}</b></div>
+    <div class="stat out"><span>Ausgaben</span><b>${eur.format(s.exp)}</b></div>
+    <div class="stat ${s.bal < 0 ? 'out' : 'in'}"><span>Saldo</span><b>${eur.format(s.bal)}</b></div>`;
+
+  const cats = new Set([...data.settings.categories, ...data.finance.map(f => f.cat).filter(Boolean)]);
+  $('#catList').innerHTML = [...cats].sort((a, b) => a.localeCompare(b, 'de')).map(c => `<option value="${esc(c)}"></option>`).join('');
+
+  const entries = data.finance.filter(f => f.date && f.date.slice(0, 7) === ym)
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.created || '').localeCompare(a.created || ''));
+  const byCat = {};
+  for (const f of entries) if (f.type !== 'einnahme') byCat[f.cat || 'Ohne Kategorie'] = (byCat[f.cat || 'Ohne Kategorie'] || 0) + f.amount;
+  const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const max = catRows.length ? catRows[0][1] : 0;
+  $('#finCats').innerHTML = catRows.length
+    ? catRows.map(([c, v]) => `<div class="bar-row"><span>${esc(c)}</span><span class="amt">${eur.format(v)}</span><span class="bar"><i style="width:${max ? (v / max * 100).toFixed(1) : 0}%"></i></span></div>`).join('')
+    : '<p class="empty">Keine Ausgaben in diesem Monat.</p>';
+  $('#finList').innerHTML = entries.length
+    ? entries.map(f => `<button class="fin-row" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}${f.cat ? `<span class="c">${esc(f.cat)}</span>` : ''}</span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`).join('')
+    : '<p class="empty">Noch keine Buchungen. Erfasse oben die erste.</p>';
+}
+
+function renderSettings() {
+  let h = '';
+  if (FS) {
+    h += '<p>Am PC speichert das Dashboard direkt in einen Ordner. Wähle dafür einen Ordner in deinem OneDrive, zum Beispiel <b>OneDrive\\Dashboard</b>. Beim Öffnen wird automatisch die neueste Datei aus diesem Ordner geladen.</p>';
+    if (sync.dir) h += `<p class="muted">Verbundener Ordner: <b>${esc(sync.dir.name)}</b>${sync.lastSaved ? '. Zuletzt gespeichert: ' + fmtDateTime(sync.lastSaved) : ''}.</p>`;
+    h += `<div class="row"><button class="btn primary" data-act="choose-folder">${sync.dir ? 'Anderen Ordner wählen' : 'Ordner wählen'}</button>${sync.ready ? '<button class="btn" data-act="pull">Neueste Datei jetzt laden</button>' : ''}</div>`;
+  } else {
+    h += '<p>Auf diesem Gerät tauschst du die Daten über Dateien aus: Importiere vor dem Bearbeiten die neueste Datei aus deinem OneDrive-Ordner und exportiere sie danach wieder dorthin.</p>';
+  }
+  h += '<h3>Datei austauschen</h3><div class="row"><button class="btn" data-act="import">Datei importieren</button>';
+  if (!FS && canShareFiles()) h += '<button class="btn" data-act="share">An OneDrive senden</button>';
+  h += '<button class="btn" data-act="download">Datei herunterladen</button></div>';
+  h += `<p class="muted">Stand auf diesem Gerät: ${fmtDateTime(data.updatedAt)}. Enthält ${data.todos.length} Aufgaben, ${data.events.length} Termine und ${data.finance.length} Buchungen.</p>`;
+  $('#setSync').innerHTML = h;
+  const gl = $('#gcalList');
+  if (!gl.contains(document.activeElement)) {
+    gl.innerHTML = data.settings.gcals.map((c, i) => `<div class="gcal-row">
+      <input type="color" data-gcal-color="${i}" value="${esc(c.color)}" aria-label="Farbe für ${esc(c.name)}">
+      <input data-gcal-name="${i}" value="${esc(c.name)}" aria-label="Name" title="${esc(c.id)}">
+      <label class="show"><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}>Anzeigen</label>
+      <button class="btn small danger" data-act="gcal-del" data-i="${i}" aria-label="${esc(c.name)} entfernen">Entfernen</button>
+    </div>`).join('');
+  }
+}
+
+/* ---------- Dialog ---------- */
+const dlg = $('#dlg');
+let dlgState = null;
+function fieldHtml(f) {
+  const id = 'f_' + f.name;
+  let input;
+  if (f.type === 'textarea') input = `<textarea id="${id}" name="${f.name}" rows="3">${esc(f.value)}</textarea>`;
+  else if (f.type === 'select') input = `<select id="${id}" name="${f.name}">${f.options.map(o => `<option value="${esc(o.value)}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+  else input = `<input id="${id}" name="${f.name}" type="${f.type || 'text'}" value="${esc(f.value)}"${f.required ? ' required' : ''}${f.list ? ` list="${f.list}"` : ''}${f.inputmode ? ` inputmode="${f.inputmode}"` : ''}>`;
+  return `<div class="field"><label for="${id}">${esc(f.label)}</label>${input}</div>`;
+}
+function openDialog({ title, fields, onSave, onDelete }) {
+  dlgState = { onSave, onDelete };
+  $('#dlgTitle').textContent = title;
+  $('#dlgBody').innerHTML = fields.map(fieldHtml).join('');
+  $('#dlgDelete').hidden = !onDelete;
+  dlg.showModal();
+}
+$('#dlgForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const vals = Object.fromEntries(new FormData(e.target));
+  if (dlgState && dlgState.onSave(vals) === false) return;
+  dlg.close();
+});
+$('#dlgCancel').addEventListener('click', () => dlg.close());
+$('#dlgDelete').addEventListener('click', () => { if (dlgState && dlgState.onDelete && confirm('Wirklich löschen?')) { dlgState.onDelete(); dlg.close(); } });
+
+function editTodo(id) {
+  const t = data.todos.find(x => x.id === id); if (!t) return;
+  openDialog({
+    title: 'Aufgabe bearbeiten',
+    fields: [{ name: 'text', label: 'Aufgabe', value: t.title, required: true },
+             { name: 'due', label: 'Fällig am', type: 'date', value: t.due },
+             { name: 'note', label: 'Notiz', type: 'textarea', value: t.note }],
+    onSave: v => { const title = v.text.trim(); if (!title) return false; t.title = title; t.due = v.due || ''; t.note = (v.note || '').trim(); commit(); },
+    onDelete: () => { data.todos = data.todos.filter(x => x !== t); commit(); }
+  });
+}
+function editEvent(id, date) {
+  const ev = id ? data.events.find(x => x.id === id) : null;
+  if (id && !ev) return;
+  openDialog({
+    title: ev ? 'Termin bearbeiten' : 'Neuer Termin',
+    fields: [{ name: 'text', label: 'Titel', value: ev?.title, required: true },
+             { name: 'date', label: 'Datum', type: 'date', value: ev?.date || date || todayStr(), required: true },
+             { name: 'time', label: 'Uhrzeit (optional)', type: 'time', value: ev?.time },
+             { name: 'note', label: 'Notiz', type: 'textarea', value: ev?.note }],
+    onSave: v => {
+      const rec = { title: v.text.trim(), date: v.date, time: v.time || '', note: (v.note || '').trim() };
+      if (!rec.title || !rec.date) return false;
+      if (ev) Object.assign(ev, rec); else data.events.push({ id: uid(), created: new Date().toISOString(), ...rec });
+      ui.calDay = rec.date; ui.calMonth = rec.date.slice(0, 7);
+      commit();
+    },
+    onDelete: ev ? () => { data.events = data.events.filter(x => x !== ev); commit(); } : null
+  });
+}
+function addCategory(c) { c = (c || '').trim(); if (c && !data.settings.categories.includes(c)) data.settings.categories.push(c); }
+function editFin(id) {
+  const f = data.finance.find(x => x.id === id); if (!f) return;
+  openDialog({
+    title: 'Buchung bearbeiten',
+    fields: [{ name: 'type', label: 'Art', type: 'select', value: f.type, options: [{ value: 'ausgabe', label: 'Ausgabe' }, { value: 'einnahme', label: 'Einnahme' }] },
+             { name: 'date', label: 'Datum', type: 'date', value: f.date, required: true },
+             { name: 'desc', label: 'Beschreibung', value: f.desc, required: true },
+             { name: 'cat', label: 'Kategorie', value: f.cat, list: 'catList' },
+             { name: 'amount', label: 'Betrag in €', value: num2(f.amount), required: true, inputmode: 'decimal' }],
+    onSave: v => {
+      const amount = parseAmount(v.amount);
+      if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben, zum Beispiel 12,50.'); return false; }
+      Object.assign(f, { type: v.type, date: v.date, desc: v.desc.trim(), cat: (v.cat || '').trim(), amount });
+      addCategory(f.cat);
+      commit();
+    },
+    onDelete: () => { data.finance = data.finance.filter(x => x !== f); commit(); }
+  });
+}
+
+/* ---------- Ereignisse ---------- */
+function goto(view) {
+  ui.view = view; meta.view = view; saveMeta();
+  if (view === 'fin' && !$('#finForm').elements.namedItem('date').value) $('#finForm').elements.namedItem('date').value = todayStr();
+  renderNav();
+  window.scrollTo(0, 0);
+}
+function shiftMonth(key, delta) {
+  const [y, m] = ui[key].split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  ui[key] = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const d = b.dataset;
+  switch (d.act) {
+    case 'goto': goto(d.view); if (d.focus) setTimeout(() => { const el = $(d.focus); if (el) el.focus(); }, 0); break;
+    case 'goto-google': ui.calMode = 'google'; goto('cal'); renderCal(); break;
+    case 'choose-folder': await chooseFolder(); break;
+    case 'reconnect': await reconnect(); break;
+    case 'pull': if (!(await pullFromFolder())) toast('Du hast bereits den neuesten Stand.'); break;
+    case 'export': if (canShareFiles()) await shareExport(); else downloadExport(); break;
+    case 'share': await shareExport(); break;
+    case 'download': downloadExport(); break;
+    case 'import': $('#importInput').click(); break;
+    case 'todo-filter': ui.todoFilter = d.f; renderTodos(); break;
+    case 'todo-edit': editTodo(d.id); break;
+    case 'todo-clear-done': {
+      const n = data.todos.filter(x => x.done).length;
+      if (n && confirm(`${n} erledigte ${n === 1 ? 'Aufgabe' : 'Aufgaben'} endgültig löschen?`)) { data.todos = data.todos.filter(x => !x.done); commit(); }
+      break;
+    }
+    case 'cal-mode': ui.calMode = d.m; renderCal(); break;
+    case 'cal-prev': shiftMonth('calMonth', -1); renderCal(); break;
+    case 'cal-next': shiftMonth('calMonth', 1); renderCal(); break;
+    case 'cal-today': ui.calMonth = todayStr().slice(0, 7); ui.calDay = todayStr(); renderCal(); break;
+    case 'cal-day': ui.calDay = d.d; ui.calMonth = d.d.slice(0, 7); renderCal(); break;
+    case 'event-new': editEvent(null, ui.calDay); break;
+    case 'event-edit': editEvent(d.id); break;
+    case 'fin-prev': shiftMonth('finMonth', -1); renderFin(); break;
+    case 'fin-next': shiftMonth('finMonth', 1); renderFin(); break;
+    case 'fin-type': ui.finType = d.t; renderFin(); break;
+    case 'fin-edit': editFin(d.id); break;
+    case 'gcal-add': {
+      const ids = gcalIdsFrom($('#gcalInput').value);
+      if (!ids.length) { toast('Keine Kalender-ID gefunden. Eine Kalender-ID enthält ein @, zum Beispiel …@group.calendar.google.com.'); break; }
+      const g = data.settings.gcals;
+      let added = 0;
+      for (const id of ids) if (!g.some(c => c.id === id)) { g.push(newGcal(id, g.length)); added++; }
+      $('#gcalInput').value = '';
+      if (added) { commit(); toast(added === 1 ? '1 Kalender hinzugefügt' : added + ' Kalender hinzugefügt'); }
+      else toast('Diese Kalender sind schon eingebunden.');
+      break;
+    }
+    case 'gcal-del': {
+      const g = data.settings.gcals, c = g[+d.i];
+      if (c && confirm(`„${c.name}“ aus dem Dashboard entfernen? In Google bleibt der Kalender erhalten.`)) { g.splice(+d.i, 1); commit(); }
+      break;
+    }
+    case 'gcal-mode': data.settings.gcalMode = d.m; commit(); break;
+  }
+});
+
+document.addEventListener('change', e => {
+  const ds = e.target.dataset || {};
+  const g = data.settings.gcals;
+  if (ds.gcal !== undefined && g[+ds.gcal]) { g[+ds.gcal].on = e.target.checked; commit(); return; }
+  if (ds.gcalColor !== undefined && g[+ds.gcalColor]) { g[+ds.gcalColor].color = e.target.value; commit(); return; }
+  if (ds.gcalName !== undefined && g[+ds.gcalName]) { g[+ds.gcalName].name = e.target.value.trim() || g[+ds.gcalName].name; e.target.blur(); commit(); return; }
+  const id = ds.todo;
+  if (!id) return;
+  const t = data.todos.find(x => x.id === id);
+  if (!t) return;
+  t.done = e.target.checked;
+  t.doneAt = t.done ? new Date().toISOString() : null;
+  commit();
+});
+
+$('#importInput').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) importFile(f);
+  e.target.value = '';
+});
+
+$('#todoForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const form = e.target, text = form.elements.namedItem('text'), due = form.elements.namedItem('due');
+  const title = text.value.trim();
+  if (!title) return;
+  data.todos.push({ id: uid(), title, due: due.value || '', note: '', done: false, created: new Date().toISOString() });
+  form.reset();
+  commit();
+  text.focus();
+});
+
+$('#finForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const el = n => e.target.elements.namedItem(n);
+  const amount = parseAmount(el('amount').value);
+  if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben, zum Beispiel 12,50.'); el('amount').focus(); return; }
+  const rec = { id: uid(), type: ui.finType, date: el('date').value || todayStr(), desc: el('desc').value.trim(),
+                cat: el('cat').value.trim(), amount, created: new Date().toISOString() };
+  if (!rec.desc) return;
+  data.finance.push(rec);
+  addCategory(rec.cat);
+  ui.finMonth = rec.date.slice(0, 7);
+  el('desc').value = ''; el('cat').value = ''; el('amount').value = '';
+  commit();
+  el('desc').focus();
+});
+
+let lastPull = 0;
+function checkForNewer() {
+  if (Date.now() - lastPull < 3000) return;
+  lastPull = Date.now();
+  if (sync.ready) pullFromFolder();
+}
+window.addEventListener('focus', () => { checkForNewer(); renderHome(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkForNewer(); renderHome(); } });
+window.addEventListener('beforeunload', e => { if (sync.pending) { e.preventDefault(); e.returnValue = ''; } });
+
+let toastTimer;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+/* ---------- Start ---------- */
+$('#finForm').elements.namedItem('date').value = todayStr();
+render();
+initFolder();
+</script>
+</body>
+</html>
