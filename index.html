@@ -261,6 +261,46 @@ dialog h2{margin:0 0 14px;font-size:18px}
 }
 .day-panel .panel-head{flex-wrap:wrap}
 
+/* Farbkreise in den Einstellungen */
+.swatch{position:relative;display:inline-block;width:30px;height:30px;border-radius:50%;background:var(--c);flex:none;cursor:pointer;box-shadow:inset 0 0 0 1px rgb(0 0 0 / .15)}
+.set-row .swatch input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;padding:0;border:0}
+.swatch:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+
+/* Konten */
+.acc-bar{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:10px}
+.acc-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;min-width:0}
+.acc-card.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.acc-main{border:0;background:none;font:inherit;color:inherit;text-align:left;padding:10px 14px 2px;cursor:pointer;display:flex;flex-direction:column;gap:2px;border-radius:var(--radius) var(--radius) 0 0}
+.acc-name{font-size:13px;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acc-bal{font-size:20px;font-weight:650;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.acc-bal.neg{color:var(--expense)}
+.acc-tools{display:flex;gap:14px;align-items:center;padding:2px 14px 10px}
+.acc-tools .link{padding:0;text-decoration:none}
+.fin-form.with-acc{display:flex;flex-wrap:wrap}
+.fin-form.with-acc > *{flex:1 1 140px;min-width:0}
+.fin-form.with-acc .seg{flex:0 0 auto}
+.fin-form.with-acc [name=date]{flex:0 1 150px}
+.fin-form.with-acc [name=desc]{flex:3 1 220px}
+.fin-form.with-acc [name=amount]{flex:0 1 120px}
+.fin-form.with-acc [name=acc]{flex:0 1 200px}
+.fin-form.with-acc .btn{flex:0 0 auto;margin-left:auto}
+.fin-row.transfer .amt{color:var(--muted)}
+
+/* CSV-Import */
+dialog.wide{width:min(900px,calc(100vw - 24px))}
+.imp-top{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.imp-map{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.imp-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin-top:4px}
+.imp-table{width:100%;border-collapse:collapse;font-size:13px}
+.imp-table th,.imp-table td{padding:6px 10px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+.imp-table th{border-top:0;background:var(--surface-2);font-weight:600;color:var(--muted);white-space:nowrap}
+.imp-table td:nth-child(1){white-space:nowrap}
+.imp-table td:nth-child(3){max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imp-table .r{text-align:right;white-space:nowrap}
+.imp-table tr.dup td{color:var(--muted);text-decoration:line-through}
+#impDlg .dlg-actions{margin-top:14px;flex-wrap:wrap}
+@media (max-width:640px){.imp-top,.imp-map{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body>
@@ -346,6 +386,11 @@ dialog h2{margin:0 0 14px;font-size:18px}
             <button class="btn icon" data-act="fin-next" aria-label="Nächster Monat">›</button>
           </div>
         </div>
+        <div class="acc-bar" id="accBar"></div>
+        <div class="row" style="margin:0 0 16px">
+          <button class="btn small primary" data-act="imp-open">Umsätze aus CSV importieren</button>
+          <button class="btn small" data-act="acc-new">Konto hinzufügen</button>
+        </div>
         <div class="fin-sum" id="finSum"></div>
         <form id="finForm" class="panel fin-form" autocomplete="off">
           <div class="seg" id="finType">
@@ -356,6 +401,7 @@ dialog h2{margin:0 0 14px;font-size:18px}
           <input name="desc" required placeholder="Beschreibung" aria-label="Beschreibung">
           <input name="cat" list="catList" placeholder="Kategorie" aria-label="Kategorie">
           <input name="amount" required inputmode="decimal" placeholder="Betrag in €" aria-label="Betrag in Euro">
+          <select name="acc" aria-label="Konto"></select>
           <button class="btn primary">Buchen</button>
         </form>
         <datalist id="catList"></datalist>
@@ -370,7 +416,7 @@ dialog h2{margin:0 0 14px;font-size:18px}
         <section class="panel"><h2>Google-Konto und Synchronisation</h2><div id="setSync"></div></section>
         <section class="panel">
           <h2>Google-Kalender</h2>
-          <p class="muted">Hier erscheinen automatisch alle Kalender aus deinem Google-Konto, auch abonnierte und mit dir geteilte. Tippe auf das Farbfeld, um eine eigene Farbe zu wählen. Kalender ohne Haken bei „Anzeigen“ tauchen im Kalender gar nicht auf, auch nicht als Schalter.</p>
+          <p class="muted">Hier erscheinen automatisch alle Kalender aus deinem Google-Konto, auch abonnierte und mit dir geteilte. Tippe auf den Farbkreis, um eine eigene Farbe zu wählen. Kalender ohne Haken bei „Anzeigen“ tauchen im Kalender gar nicht auf, auch nicht als Schalter.</p>
           <div id="gcalList"></div>
         </section>
         <section class="panel">
@@ -399,6 +445,17 @@ dialog h2{margin:0 0 14px;font-size:18px}
     </div>
   </form>
 </dialog>
+<dialog id="impDlg" class="wide">
+  <h2>Umsätze aus CSV importieren</h2>
+  <div class="imp-top">
+    <div class="field"><label for="impAcc">Konto</label><select id="impAcc"></select></div>
+    <div class="field"><label for="impFile">CSV-Datei</label><input type="file" id="impFile" accept=".csv,.txt,text/csv,text/plain"></div>
+  </div>
+  <div id="impBank"></div>
+  <div id="impMap"></div>
+  <div id="impPreview"></div>
+  <div class="dlg-actions"><span id="impInfo" class="muted"></span><span class="spacer"></span><button type="button" class="btn" id="impCancel">Abbrechen</button><button type="button" class="btn primary" id="impGo" disabled>Importieren</button></div>
+</dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="importInput" accept=".json,application/json" hidden>
 
@@ -416,7 +473,8 @@ const CAL_API = 'https://www.googleapis.com/calendar/v3';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 const LS_DATA = 'dashboard.daten', LS_META = 'dashboard.meta', LS_TOKEN = 'dashboard.token', LS_GCACHE = 'dashboard.gcache';
-const DEFAULT_CATS = ['Wohnen','Lebensmittel','Auto','Versicherungen','Freizeit','Gesundheit','Gehalt','Sonstiges'];
+const DEFAULT_CATS = ['Wohnen','Lebensmittel','Auto','Versicherungen','Freizeit','Gesundheit','Gehalt','Umbuchung','Sonstiges'];
+const TRANSFER = 'Umbuchung';   // Geld zwischen eigenen Konten: zählt nicht als Einnahme oder Ausgabe
 
 /* ---------- Hilfsfunktionen ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -474,6 +532,7 @@ function parseAmount(s) {
 /* ---------- Daten ---------- */
 function emptyData() {
   return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
+           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', startBalance: 0, startDate: '' }],
            settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS] } };
 }
 function normalize(d) {
@@ -489,11 +548,15 @@ function normalize(d) {
   delete s.gcalSrc; delete s.gcalMode;                 // aus der Version mit eingebettetem Google-Kalender
   if (typeof s.showOwn !== 'boolean') s.showOwn = true;
   if (typeof s.showTodos !== 'boolean') s.showTodos = true;
+  if (!s.categories.includes(TRANSFER)) s.categories.push(TRANSFER);
+  let accounts = Array.isArray(d.accounts) ? d.accounts.filter(a => a && a.id).map(a => ({ id: a.id, name: a.name || 'Konto',
+    url: a.url || '', startBalance: Number(a.startBalance) || 0, startDate: a.startDate || '' })) : [];
+  if (!accounts.length) accounts = [{ id: 'konto-1', name: 'Hauptkonto', url: '', startBalance: 0, startDate: '' }];
+  const finance = (Array.isArray(d.finance) ? d.finance : []).map(f => accounts.some(a => a.id === f.accountId) ? f : { ...f, accountId: accounts[0].id });
   return { app: 'dashboard', version: 2, updatedAt: d.updatedAt || null,
            todos: Array.isArray(d.todos) ? d.todos : [],
            events: Array.isArray(d.events) ? d.events : [],
-           finance: Array.isArray(d.finance) ? d.finance : [],
-           settings: s };
+           finance, accounts, settings: s };
 }
 function lsGet(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fallback; } catch { return fallback; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn(e); } }
@@ -507,7 +570,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { view: meta.view || 'home', todoFilter: 'offen', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -928,10 +991,10 @@ function renderHome() {
     ? `<ul class="mini">${rows.slice(0, 8).join('')}</ul>`
     : `<p class="empty">Keine Termine in den nächsten 14 Tagen.</p>${!signedIn() && data.settings.gcals.length ? '<p class="muted">Verbinde dich mit Google, um deine Google-Termine zu sehen.</p>' : ''}`;
 
-  const ym = t.slice(0, 7), s = finSums(ym);
+  const ym = t.slice(0, 7), s = finSums(ym, true);
   $('#homeFinTitle').textContent = 'Finanzen im ' + parseYmd(ym + '-01').toLocaleDateString('de-DE', { month: 'long' });
   $('#homeFin').innerHTML = s.n
-    ? `<div class="money"><span>Einnahmen</span><span class="amt in">${eur.format(s.inc)}</span><span>Ausgaben</span><span class="amt out">${eur.format(s.exp)}</span><span class="total">Saldo</span><span class="total amt ${s.bal < 0 ? 'out' : 'in'}">${eur.format(s.bal)}</span></div>`
+    ? `<div class="money"><span>Einnahmen</span><span class="amt in">${eur.format(s.inc)}</span><span>Ausgaben</span><span class="amt out">${eur.format(s.exp)}</span><span class="total">Saldo</span><span class="total amt ${s.bal < 0 ? 'out' : 'in'}">${eur.format(s.bal)}</span>${data.accounts.some(a => a.startDate || a.startBalance) ? `<span class="muted">Kontostand gesamt</span><span class="amt muted">${eur.format(data.accounts.reduce((x, a) => x + accBalance(a), 0))}</span>` : ''}</div>`
     : `<p class="empty">Noch keine Buchungen in diesem Monat.</p><div class="row"><button class="btn small" data-act="goto" data-view="fin" data-focus="#finForm [name=desc]">Buchung erfassen</button></div>`;
 }
 
@@ -1027,15 +1090,47 @@ function renderCal() {
   $('#dayList').innerHTML = dl || '<p class="empty">Nichts geplant.</p>';
 }
 
-function finSums(ym) {
+const inAcc = f => ui.finAccount === 'all' || f.accountId === ui.finAccount;
+function finSums(ym, all) {
   let inc = 0, exp = 0, n = 0;
-  for (const f of data.finance) if (f.date && f.date.slice(0, 7) === ym) { n++; if (f.type === 'einnahme') inc += f.amount; else exp += f.amount; }
+  for (const f of data.finance) {
+    if (!f.date || f.date.slice(0, 7) !== ym || (!all && !inAcc(f))) continue;
+    n++;
+    if (f.cat === TRANSFER) continue;
+    if (f.type === 'einnahme') inc += f.amount; else exp += f.amount;
+  }
   return { inc, exp, bal: inc - exp, n };
 }
+function accBalance(a) {
+  let b = Number(a.startBalance) || 0;
+  for (const f of data.finance)
+    if (f.accountId === a.id && (!a.startDate || f.date > a.startDate)) b += f.type === 'einnahme' ? f.amount : -f.amount;
+  return Math.round(b * 100) / 100;
+}
+const accName = id => (data.accounts.find(a => a.id === id) || {}).name || '';
+function renderAccounts() {
+  const accs = data.accounts;
+  if (accs.length === 1) ui.finAccount = accs[0].id;
+  else if (ui.finAccount !== 'all' && !accs.some(a => a.id === ui.finAccount)) ui.finAccount = 'all';
+  const card = (id, name, bal, a) => `<div class="acc-card${ui.finAccount === id ? ' sel' : ''}">
+    <button class="acc-main" data-act="acc-select" data-id="${esc(id)}"><span class="acc-name">${esc(name)}</span><span class="acc-bal${bal < 0 ? ' neg' : ''}">${eur.format(bal)}</span></button>
+    ${a ? `<div class="acc-tools">${a.url ? `<a class="link" href="${esc(a.url)}" target="_blank" rel="noopener">Online-Banking</a>` : ''}<button class="link" data-act="acc-edit" data-id="${esc(a.id)}">Bearbeiten</button></div>` : '<div class="acc-tools"><span class="sub">Summe aller Konten</span></div>'}
+  </div>`;
+  const total = accs.reduce((sum, a) => sum + accBalance(a), 0);
+  $('#accBar').innerHTML = (accs.length > 1 ? card('all', 'Alle Konten', total, null) : '') + accs.map(a => card(a.id, a.name, accBalance(a), a)).join('');
+}
 function renderFin() {
-  const ym = ui.finMonth;
+  renderAccounts();
+  const ym = ui.finMonth, multi = data.accounts.length > 1;
   $('#finTitle').textContent = monthName(ym);
   $$('#finType button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === ui.finType));
+  const sel = $('#finForm').elements.namedItem('acc');
+  sel.hidden = !multi;
+  $('#finForm').classList.toggle('with-acc', multi);
+  if (document.activeElement !== sel) {
+    sel.innerHTML = data.accounts.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
+    sel.value = ui.finAccount !== 'all' ? ui.finAccount : (meta.lastAccount && data.accounts.some(a => a.id === meta.lastAccount) ? meta.lastAccount : data.accounts[0].id);
+  }
   const s = finSums(ym);
   $('#finSum').innerHTML = `
     <div class="stat in"><span>Einnahmen</span><b>${eur.format(s.inc)}</b></div>
@@ -1043,18 +1138,21 @@ function renderFin() {
     <div class="stat ${s.bal < 0 ? 'out' : 'in'}"><span>Saldo</span><b>${eur.format(s.bal)}</b></div>`;
   const cats = new Set([...data.settings.categories, ...data.finance.map(f => f.cat).filter(Boolean)]);
   $('#catList').innerHTML = [...cats].sort((a, b) => a.localeCompare(b, 'de')).map(c => `<option value="${esc(c)}"></option>`).join('');
-  const entries = data.finance.filter(f => f.date && f.date.slice(0, 7) === ym)
+  const entries = data.finance.filter(f => f.date && f.date.slice(0, 7) === ym && inAcc(f))
     .sort((a, b) => b.date.localeCompare(a.date) || (b.created || '').localeCompare(a.created || ''));
   const byCat = {};
-  for (const f of entries) if (f.type !== 'einnahme') byCat[f.cat || 'Ohne Kategorie'] = (byCat[f.cat || 'Ohne Kategorie'] || 0) + f.amount;
+  for (const f of entries) if (f.type !== 'einnahme' && f.cat !== TRANSFER) byCat[f.cat || 'Ohne Kategorie'] = (byCat[f.cat || 'Ohne Kategorie'] || 0) + f.amount;
   const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const max = catRows.length ? catRows[0][1] : 0;
   $('#finCats').innerHTML = catRows.length
     ? catRows.map(([c, v]) => `<div class="bar-row"><span>${esc(c)}</span><span class="amt">${eur.format(v)}</span><span class="bar"><i style="width:${max ? (v / max * 100).toFixed(1) : 0}%"></i></span></div>`).join('')
     : '<p class="empty">Keine Ausgaben in diesem Monat.</p>';
   $('#finList').innerHTML = entries.length
-    ? entries.map(f => `<button class="fin-row" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}${f.cat ? `<span class="c">${esc(f.cat)}</span>` : ''}</span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`).join('')
-    : '<p class="empty">Noch keine Buchungen. Erfasse oben die erste.</p>';
+    ? entries.map(f => {
+        const sub = [f.cat || 'Ohne Kategorie', ui.finAccount === 'all' && multi ? accName(f.accountId) : ''].filter(Boolean).join(', ');
+        return `<button class="fin-row${f.cat === TRANSFER ? ' transfer' : ''}" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}<span class="c">${esc(sub)}</span></span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`;
+      }).join('')
+    : '<p class="empty">Noch keine Buchungen in diesem Monat. Erfasse oben eine oder importiere die Umsätze deines Kontos.</p>';
 }
 
 function renderSettings() {
@@ -1070,7 +1168,7 @@ function renderSettings() {
   $('#setSync').innerHTML = h;
 
   const st = data.settings, g = st.gcals;
-  const colorIn = (attr, val, label) => `<input type="color" ${attr} value="${esc(val)}" aria-label="Farbe für ${esc(label)}" class="swatch">`;
+  const colorIn = (attr, val, label) => `<label class="swatch" style="--c:${esc(val)}" title="Farbe ändern"><input type="color" ${attr} value="${esc(val)}" aria-label="Farbe für ${esc(label)}"></label>`;
   let gl = `<div class="set-row">${colorIn('data-color-key="ownColor"', st.ownColor, 'Dashboard-Termine')}<span class="name">Dashboard-Termine<span class="sub">Termine, die nur im Dashboard gespeichert sind</span></span></div>
             <div class="set-row">${colorIn('data-color-key="todoColor"', st.todoColor, 'Aufgaben')}<span class="name">Aufgaben<span class="sub">Fällige Aufgaben im Kalender</span></span></div>`;
   gl += g.length
@@ -1089,7 +1187,7 @@ function fieldHtml(f) {
   else if (f.type === 'checkbox') return `<div class="field"><label class="chk"><input type="checkbox" id="${id}" name="${f.name}" value="1"${f.value ? ' checked' : ''}> ${esc(f.label)}</label></div>`;
   else if (f.type === 'select') input = `<select id="${id}" name="${f.name}">${f.options.map(o => `<option value="${esc(o.value)}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
   else input = `<input id="${id}" name="${f.name}" type="${f.type || 'text'}" value="${esc(f.value)}"${f.required ? ' required' : ''}${f.list ? ` list="${f.list}"` : ''}${f.inputmode ? ` inputmode="${f.inputmode}"` : ''}>`;
-  return `<div class="field${f.half ? ' half' : ''}"><label for="${id}">${esc(f.label)}</label>${input}</div>`;
+  return `<div class="field${f.half ? ' half' : ''}"><label for="${id}">${esc(f.label)}</label>${input}${f.hint ? `<span class="sub">${esc(f.hint)}</span>` : ''}</div>`;
 }
 function openDialog({ title, fields, onSave, onDelete }) {
   dlgState = { onSave, onDelete };
@@ -1229,23 +1327,269 @@ async function runPendingEvent() {
 function addCategory(c) { c = (c || '').trim(); if (c && !data.settings.categories.includes(c)) data.settings.categories.push(c); }
 function editFin(id) {
   const f = data.finance.find(x => x.id === id); if (!f) return;
+  const fields = [{ name: 'type', label: 'Art', type: 'select', value: f.type, options: [{ value: 'ausgabe', label: 'Ausgabe' }, { value: 'einnahme', label: 'Einnahme' }], half: true }];
+  if (data.accounts.length > 1) fields.push({ name: 'acc', label: 'Konto', type: 'select', value: f.accountId, options: data.accounts.map(a => ({ value: a.id, label: a.name })), half: true });
+  fields.push({ name: 'date', label: 'Datum', type: 'date', value: f.date, required: true, half: true },
+              { name: 'amount', label: 'Betrag in €', value: num2(f.amount), required: true, inputmode: 'decimal', half: true },
+              { name: 'desc', label: 'Beschreibung', value: f.desc, required: true },
+              { name: 'cat', label: 'Kategorie', value: f.cat, list: 'catList', hint: 'Umbuchungen zwischen eigenen Konten zählen nicht als Einnahme oder Ausgabe.' },
+              { name: 'note', label: 'Verwendungszweck / Notiz', type: 'textarea', value: f.note });
   openDialog({
     title: 'Buchung bearbeiten',
-    fields: [{ name: 'type', label: 'Art', type: 'select', value: f.type, options: [{ value: 'ausgabe', label: 'Ausgabe' }, { value: 'einnahme', label: 'Einnahme' }] },
-             { name: 'date', label: 'Datum', type: 'date', value: f.date, required: true },
-             { name: 'desc', label: 'Beschreibung', value: f.desc, required: true },
-             { name: 'cat', label: 'Kategorie', value: f.cat, list: 'catList' },
-             { name: 'amount', label: 'Betrag in €', value: num2(f.amount), required: true, inputmode: 'decimal' }],
+    fields,
     onSave: v => {
       const amount = parseAmount(v.amount);
       if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben, zum Beispiel 12,50.'); return false; }
-      Object.assign(f, { type: v.type, date: v.date, desc: v.desc.trim(), cat: (v.cat || '').trim(), amount });
+      const oldCat = f.cat || '';
+      Object.assign(f, { type: v.type, date: v.date, desc: v.desc.trim(), cat: (v.cat || '').trim(), amount, note: (v.note || '').trim() });
+      if (v.acc) f.accountId = v.acc;
       addCategory(f.cat);
+      if (f.party && f.cat && f.cat !== oldCat) {
+        const key = f.party.toLowerCase();
+        const same = data.finance.filter(x => x !== f && x.party && x.party.toLowerCase() === key && x.cat !== f.cat);
+        if (same.length && confirm(`Kategorie „${f.cat}“ auch für ${same.length} weitere ${same.length === 1 ? 'Buchung' : 'Buchungen'} von „${f.party}“ übernehmen?`))
+          same.forEach(x => { x.cat = f.cat; });
+      }
       commit();
     },
     onDelete: () => { data.finance = data.finance.filter(x => x !== f); commit(); }
   });
 }
+function parseSigned(s) {
+  s = String(s ?? '').trim().replace(/\s|€|EUR/gi, '');
+  if (!s) return NaN;
+  let neg = false;
+  if (s.endsWith('-')) { neg = true; s = s.slice(0, -1); }
+  if (s.endsWith('+')) s = s.slice(0, -1);
+  const lc = s.lastIndexOf(','), ld = s.lastIndexOf('.');
+  if (lc > ld) s = s.replace(/\./g, '').replace(',', '.');          // 1.234,56
+  else if (lc >= 0) s = s.replace(/,/g, '');                         // 1,234.56
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ''); // 1.234
+  const n = Number(s);
+  return isFinite(n) ? (neg ? -n : n) : NaN;
+}
+function editAccount(id) {
+  const a = id ? data.accounts.find(x => x.id === id) : null;
+  if (id && !a) return;
+  const n = a ? data.finance.filter(f => f.accountId === a.id).length : 0;
+  openDialog({
+    title: a ? 'Konto bearbeiten' : 'Neues Konto',
+    fields: [{ name: 'name', label: 'Name', value: a ? a.name : '', required: true },
+             { name: 'url', label: 'Online-Banking', value: a ? a.url : '', inputmode: 'url', hint: 'Adresse der Login-Seite deiner Bank, z. B. https://www.sparkasse-passau.de' },
+             { name: 'startBalance', label: 'Kontostand', value: a && (a.startBalance || a.startDate) ? num2(a.startBalance) : '', inputmode: 'decimal', half: true },
+             { name: 'startDate', label: 'am', type: 'date', value: a ? a.startDate : '', half: true }],
+    onSave: v => {
+      const name = v.name.trim();
+      if (!name) return false;
+      let url = (v.url || '').trim();
+      if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+      if (url) { try { new URL(url); } catch { toast('Die Adresse fürs Online-Banking ist ungültig.'); return false; } }
+      const sb = (v.startBalance || '').trim() ? parseSigned(v.startBalance) : 0;
+      if (!isFinite(sb)) { toast('Bitte einen gültigen Kontostand eingeben, zum Beispiel 1.250,00 oder -80,00.'); return false; }
+      const rec = { name, url, startBalance: sb, startDate: v.startDate || '' };
+      if (a) Object.assign(a, rec);
+      else { const na = { id: uid(), ...rec }; data.accounts.push(na); ui.finAccount = na.id; }
+      commit();
+    },
+    onDelete: a && data.accounts.length > 1 ? () => {
+      if (n && !confirm(`Das Konto „${a.name}“ hat ${n} Buchungen. Diese werden mit gelöscht.`)) return;
+      data.finance = data.finance.filter(f => f.accountId !== a.id);
+      data.accounts = data.accounts.filter(x => x !== a);
+      ui.finAccount = 'all';
+      commit();
+    } : null
+  });
+  const hint = document.createElement('p');
+  hint.className = 'muted'; hint.style.gridColumn = '1 / -1'; hint.style.margin = '-4px 0 12px';
+  hint.textContent = 'Kontostand und Datum sind optional: Trag den Stand von deinem Kontoauszug an einem Tag ein, das Dashboard rechnet ab dem Folgetag mit allen Buchungen weiter.';
+  $('#dlgBody').appendChild(hint);
+}
+
+/* ---------- CSV-Import ---------- */
+const CAT_RULES = [
+  [/gehalt|lohn|bezüge|bezuege/i, 'Gehalt'],
+  [/rewe|edeka|aldi|lidl|netto|penny|kaufland|norma|globus|tegut|dm[ -]drogerie|rossmann|müller|bäcker|baecker|metzger/i, 'Lebensmittel'],
+  [/versicherung|allianz|huk|ergo|axa|debeka|signal iduna|r\+v|lvm|devk/i, 'Versicherungen'],
+  [/tankstelle|aral|shell|esso|\bjet\b|omv|agip|autohaus|kfz|adac|werkstatt/i, 'Auto'],
+  [/miete|nebenkosten|hausgeld|stadtwerke|strom|e\.on|eon energie|vodafone|telekom|o2|1&1|rundfunk/i, 'Wohnen'],
+  [/apotheke|arzt|ärzt|zahnarzt|klinik|physio/i, 'Gesundheit'],
+  [/netflix|spotify|disney|kino|restaurant|lieferando|amazon prime/i, 'Freizeit']
+];
+function guessCat(party, purpose) {
+  const key = (party || '').toLowerCase().trim();
+  if (key) for (let i = data.finance.length - 1; i >= 0; i--) {
+    const x = data.finance[i];
+    if (x.party && x.cat && x.party.toLowerCase().trim() === key) return x.cat;
+  }
+  const txt = (party || '') + ' ' + (purpose || '');
+  for (const [re, c] of CAT_RULES) if (re.test(txt)) return c;
+  return '';
+}
+function decodeFile(buf) {
+  let t;
+  try { t = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { t = new TextDecoder('windows-1252').decode(buf); }   // viele Banken liefern ANSI statt UTF-8
+  return t.replace(/^\uFEFF/, '');
+}
+function detectDelim(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim()).slice(0, 40);
+  let best = ';', score = -1;
+  for (const d of [';', '\t', ',']) {
+    const counts = lines.map(l => l.split(d).length - 1).filter(n => n > 0);
+    if (!counts.length) continue;
+    const freq = {};
+    counts.forEach(n => { freq[n] = (freq[n] || 0) + 1; });
+    const [mode, cnt] = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
+    const sc = cnt * Math.min(Number(mode), 12);
+    if (sc > score) { score = sc; best = d; }
+  }
+  return best;
+}
+function parseCsv(text, d) {
+  const rows = [];
+  let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === d) { row.push(f); f = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(f); rows.push(row); row = []; f = '';
+    } else f += ch;
+  }
+  if (f !== '' || row.length) { row.push(f); rows.push(row); }
+  return rows.map(r => r.map(c => c.trim())).filter(r => r.some(c => c !== ''));
+}
+function findHeader(rows) {
+  for (let i = 0; i < Math.min(rows.length, 40); i++) {
+    const r = rows[i].map(c => c.toLowerCase());
+    if (r.length >= 3 && r.some(c => /datum|buchungstag|date|valuta|wertstellung/.test(c)) && r.some(c => /betrag|umsatz|amount|soll|haben/.test(c))) return i;
+  }
+  return 0;
+}
+function autoMap(h) {
+  const L = h.map(x => x.toLowerCase().trim());
+  const find = (...res) => { for (const re of res) { const i = L.findIndex(x => re.test(x)); if (i >= 0) return i; } return -1; };
+  const m = {
+    date: find(/^buchungs?tag$/, /^buchungsdatum$/, /^datum$/, /buchungstag|buchungsdatum/, /^date$/, /datum|date/, /valuta|wertstellung/),
+    amount: find(/^betrag( \(€\)| \(eur\)| in eur| eur)?$/, /^umsatz( in eur)?$/, /^betrag(?!.*ursprung)/, /^amount/, /umsatz(?!art)/),
+    sh: find(/soll\s*\/\s*haben|^s\/h$|soll-haben/),
+    soll: find(/^soll( \(eur\)| in eur)?$/),
+    haben: find(/^haben( \(eur\)| in eur)?$/),
+    party: find(/begünstigter|beguenstigter|empfänger|empfaenger|zahlungsbeteiligter|gegenseite|^name|payee/, /zahlungspflichtige|auftraggeber/),
+    payer: find(/zahlungspflichtige|auftraggeber/),
+    purpose: find(/verwendungszweck/, /buchungstext|vorgang|beschreibung|^text|description/)
+  };
+  if (m.payer === m.party) m.payer = -1;   // eine gemeinsame Spalte für beide Richtungen
+  return m;
+}
+function parseDateAny(s) {
+  s = (s || '').trim();
+  let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; return `${y}-${pad(+m[2])}-${pad(+m[1])}`; }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${pad(+m[2])}-${pad(+m[1])}`;
+  return '';
+}
+const imp = { rows: null, hdr: 0, headers: [], map: null };
+function impTransactions() {
+  const { rows, hdr, map } = imp, out = [];
+  let invalid = 0;
+  for (const r of rows.slice(hdr + 1)) {
+    const date = map.date >= 0 ? parseDateAny(r[map.date]) : '';
+    let amt = NaN;
+    if (map.amount >= 0) amt = parseSigned(r[map.amount]);
+    else if (map.soll >= 0 || map.haben >= 0) amt = (parseSigned(r[map.haben]) || 0) - Math.abs(parseSigned(r[map.soll]) || 0);
+    if (map.sh >= 0 && isFinite(amt)) {
+      const v = (r[map.sh] || '').trim().toUpperCase();
+      if (v.startsWith('S')) amt = -Math.abs(amt); else if (v.startsWith('H')) amt = Math.abs(amt);
+    }
+    if (!date || !isFinite(amt) || amt === 0) { invalid++; continue; }
+    const clean = i => i >= 0 ? (r[i] || '').replace(/\s+/g, ' ').trim() : '';
+    // Getrennte Spalten für Zahler und Empfänger (z. B. DKB): bei Eingängen zählt der Zahler
+    const party = map.payer >= 0 && amt > 0 ? clean(map.payer) || clean(map.party) : clean(map.party);
+    out.push({ date, amt: Math.round(amt * 100) / 100, party, purpose: clean(map.purpose) });
+  }
+  const seen = {};
+  for (const t of out) {   // Schlüssel zum Wiedererkennen; gleiche Buchungen am selben Tag werden durchnummeriert
+    const base = `${t.date}|${t.amt.toFixed(2)}|${(t.party + ' ' + t.purpose).toLowerCase().replace(/[^a-z0-9äöüß]/g, '').slice(0, 60)}`;
+    seen[base] = (seen[base] || 0) + 1;
+    t.key = base + '#' + seen[base];
+  }
+  return { out, invalid };
+}
+const existingKeys = acc => new Set(data.finance.filter(f => f.accountId === acc && f.importKey).map(f => f.importKey));
+function openImport() {
+  imp.rows = null;
+  $('#impFile').value = '';
+  const pre = ui.finAccount !== 'all' ? ui.finAccount : data.accounts[0].id;
+  $('#impAcc').innerHTML = data.accounts.map(a => `<option value="${esc(a.id)}"${a.id === pre ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+  renderImport();
+  $('#impDlg').showModal();
+}
+function renderImport() {
+  const acc = $('#impAcc').value, a = data.accounts.find(x => x.id === acc);
+  $('#impBank').innerHTML = a && a.url
+    ? `<div class="row" style="margin:0 0 12px"><a class="btn small" href="${esc(a.url)}" target="_blank" rel="noopener">Online-Banking von „${esc(a.name)}“ öffnen</a></div>`
+    : `<p class="muted" style="margin:0 0 12px">Tipp: Unter „Bearbeiten“ beim Konto kannst du die Adresse deines Online-Bankings hinterlegen, dann erscheint hier ein direkter Link.</p>`;
+  if (!imp.rows) {
+    $('#impMap').innerHTML = '<p class="muted">Lade im Online-Banking die Umsätze als CSV-Datei herunter und wähle sie hier aus. Umsätze, die schon einmal importiert wurden, werden erkannt und übersprungen. Du kannst also ruhig überlappende Zeiträume einlesen.</p>';
+    $('#impPreview').innerHTML = ''; $('#impInfo').textContent = '';
+    $('#impGo').disabled = true; $('#impGo').textContent = 'Importieren';
+    return;
+  }
+  const opts = sel => '<option value="-1">– keine –</option>' + imp.headers.map((h, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(h || 'Spalte ' + (i + 1))}</option>`).join('');
+  const fields = [['date', 'Datum'], ['amount', 'Betrag'], ['party', 'Name / Empfänger'], ['purpose', 'Verwendungszweck']];
+  let h = `<div class="imp-map">${fields.map(([k, l]) => `<div class="field"><label for="imp_${k}">${l}</label><select id="imp_${k}" data-imp="${k}">${opts(imp.map[k])}</select></div>`).join('')}</div>`;
+  if (imp.map.sh >= 0) h += `<p class="muted">Soll/Haben-Kennzeichen erkannt in der Spalte „${esc(imp.headers[imp.map.sh])}“.</p>`;
+  if (imp.map.amount < 0 && (imp.map.soll >= 0 || imp.map.haben >= 0)) h += '<p class="muted">Getrennte Spalten für Soll und Haben erkannt.</p>';
+  $('#impMap').innerHTML = h;
+  const { out, invalid } = impTransactions(), keys = existingKeys(acc);
+  const fresh = out.filter(t => !keys.has(t.key));
+  $('#impPreview').innerHTML = out.length
+    ? `<div class="imp-wrap"><table class="imp-table"><thead><tr><th>Datum</th><th>Name</th><th>Verwendungszweck</th><th class="r">Betrag</th></tr></thead><tbody>${out.slice(0, 10).map(t =>
+        `<tr${keys.has(t.key) ? ' class="dup" title="Schon vorhanden"' : ''}><td>${esc(parseYmd(t.date).toLocaleDateString('de-DE'))}</td><td>${esc(t.party)}</td><td>${esc(t.purpose)}</td><td class="r amt ${t.amt < 0 ? 'out' : 'in'}">${eur.format(t.amt)}</td></tr>`).join('')}</tbody></table></div>${out.length > 10 ? `<p class="muted">Vorschau der ersten 10 von ${out.length} Umsätzen.</p>` : ''}`
+    : '<p class="empty">Keine Umsätze erkannt. Prüfe oben, welche Spalten Datum und Betrag enthalten.</p>';
+  $('#impInfo').textContent = out.length ? `${out.length} Umsätze erkannt, ${out.length - fresh.length} davon schon vorhanden${invalid ? `, ${invalid} Zeilen ohne Datum oder Betrag übersprungen` : ''}.` : '';
+  $('#impGo').disabled = !fresh.length;
+  $('#impGo').textContent = fresh.length ? `${fresh.length} ${fresh.length === 1 ? 'Umsatz' : 'Umsätze'} importieren` : 'Nichts Neues zu importieren';
+}
+$('#impFile').addEventListener('change', async e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try {
+    const text = decodeFile(await file.arrayBuffer());
+    const rows = parseCsv(text, detectDelim(text));
+    if (!rows.length) throw new Error('Die Datei ist leer.');
+    imp.rows = rows; imp.hdr = findHeader(rows); imp.headers = rows[imp.hdr]; imp.map = autoMap(imp.headers);
+  } catch (err) { imp.rows = null; toast('Datei konnte nicht gelesen werden: ' + err.message); }
+  renderImport();
+});
+$('#impAcc').addEventListener('change', renderImport);
+$('#impCancel').addEventListener('click', () => $('#impDlg').close());
+$('#impGo').addEventListener('click', () => {
+  const acc = $('#impAcc').value, keys = existingKeys(acc);
+  const { out } = impTransactions();
+  let n = 0, latest = '';
+  for (const t of out) {
+    if (keys.has(t.key)) continue;
+    data.finance.push({ id: uid(), type: t.amt < 0 ? 'ausgabe' : 'einnahme', date: t.date,
+      desc: t.party || t.purpose.slice(0, 80) || 'Umsatz', note: t.party ? t.purpose : '', party: t.party,
+      cat: guessCat(t.party, t.purpose), amount: Math.abs(t.amt), accountId: acc, importKey: t.key, created: new Date().toISOString() });
+    n++;
+    if (t.date > latest) latest = t.date;
+  }
+  $('#impDlg').close();
+  ui.finAccount = data.accounts.length > 1 ? acc : ui.finAccount;
+  if (latest) ui.finMonth = latest.slice(0, 7);
+  commit();
+  toast(`${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} importiert. Kategorien kannst du durch Antippen einer Buchung anpassen.`);
+});
 
 /* ---------- Bedienung ---------- */
 function goto(view) {
@@ -1293,6 +1637,10 @@ document.addEventListener('click', async e => {
     case 'fin-next': ui.finMonth = addMonths(ui.finMonth, 1); renderFin(); break;
     case 'fin-type': ui.finType = d.t; renderFin(); break;
     case 'fin-edit': editFin(d.id); break;
+    case 'acc-select': ui.finAccount = d.id; renderFin(); break;
+    case 'acc-edit': editAccount(d.id); break;
+    case 'acc-new': editAccount(null); break;
+    case 'imp-open': openImport(); break;
   }
 });
 
@@ -1315,6 +1663,7 @@ document.addEventListener('change', e => {
     return;
   }
   if (ds.colorKey) { data.settings[ds.colorKey] = e.target.value; commit(); return; }
+  if (ds.imp) { imp.map[ds.imp] = +e.target.value; renderImport(); return; }
   if (ds.todo) {
     const t = data.todos.find(x => x.id === ds.todo);
     if (!t) return;
@@ -1347,7 +1696,8 @@ $('#finForm').addEventListener('submit', e => {
   const amount = parseAmount(el('amount').value);
   if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben, zum Beispiel 12,50.'); el('amount').focus(); return; }
   const rec = { id: uid(), type: ui.finType, date: el('date').value || todayStr(), desc: el('desc').value.trim(),
-                cat: el('cat').value.trim(), amount, created: new Date().toISOString() };
+                cat: el('cat').value.trim(), amount, accountId: el('acc').value || data.accounts[0].id, created: new Date().toISOString() };
+  meta.lastAccount = rec.accountId; saveMeta();
   if (!rec.desc) return;
   data.finance.push(rec);
   addCategory(rec.cat);
