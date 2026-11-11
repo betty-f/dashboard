@@ -233,6 +233,34 @@ dialog h2{margin:0 0 14px;font-size:18px}
 .ci.g{background:var(--c);box-shadow:none}
 }
 
+/* Monatskalender mit durchgehenden Balken */
+.cal-month{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.cal-head{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));background:var(--surface-2);border-bottom:1px solid var(--line)}
+.cal-week{display:grid;grid-template-columns:34px repeat(7,minmax(0,1fr));grid-template-rows:30px repeat(var(--lanes),20px) minmax(14px,1fr);row-gap:2px;min-height:104px;border-top:1px solid var(--line)}
+.cal-week:first-child{border-top:0}
+.cal-week .cal-kw{grid-row:1/-1;grid-column:1}
+.cal-week .cal-cell{grid-row:1/-1;min-height:0;padding:4px 6px;border-left:1px solid var(--line);align-items:flex-start;justify-content:flex-start}
+.cbar{position:relative;z-index:1;pointer-events:none;align-self:stretch;margin:0 4px;padding:0 6px;font-size:11.5px;line-height:20px;border-radius:4px;background:var(--c);color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.cbar.cont-l{margin-left:0;border-top-left-radius:0;border-bottom-left-radius:0}
+.cbar.cont-r{margin-right:0;border-top-right-radius:0;border-bottom-right-radius:0}
+.cbar.todo::before{content:"✓ ";font-weight:700}
+.cal-more{position:relative;z-index:1;pointer-events:none;font-size:11px;line-height:16px;color:var(--muted);padding-left:8px;white-space:nowrap;overflow:hidden}
+#dlgBody{display:grid;grid-template-columns:1fr 1fr;column-gap:10px}
+#dlgBody .field{grid-column:1/-1}
+#dlgBody .field.half{grid-column:auto}
+.chk{display:inline-flex !important;align-items:center;gap:8px;font-size:14px !important;color:var(--ink) !important;cursor:pointer}
+.chk input{width:auto;margin:0}
+@media (max-width:640px){
+  .cal-head,.cal-week{grid-template-columns:26px repeat(7,minmax(0,1fr))}
+  .cal-week{grid-template-rows:30px repeat(var(--lanes),6px) minmax(8px,1fr);row-gap:3px;min-height:62px}
+  .cal-week .cal-cell{padding:4px 2px;align-items:center}
+  .cbar{font-size:0;padding:0;margin:0 2px;border-radius:3px}
+  .cbar.todo::before{content:none}
+  .cal-more{font-size:0}
+  .cal-more::after{content:"•••";font-size:9px;letter-spacing:1px}
+}
+.day-panel .panel-head{flex-wrap:wrap}
+
 </style>
 </head>
 <body>
@@ -302,7 +330,7 @@ dialog h2{margin:0 0 14px;font-size:18px}
           <button class="btn icon" data-act="cal-next" aria-label="Nächster Monat">›</button>
           <button class="btn small" data-act="cal-today">Heute</button>
         </div>
-        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-month" id="calGrid"></div>
         <section class="panel day-panel">
           <div class="panel-head"><h2 id="dayTitle"></h2><div class="row" style="margin:0"><button class="btn small" data-act="gcal-open">In Google Kalender öffnen</button><button class="btn small primary" data-act="event-new">Termin hinzufügen</button></div></div>
           <div id="dayList"></div>
@@ -412,6 +440,18 @@ const isoWeek = d => {           // Kalenderwoche nach DIN/ISO 8601
   t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
   return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
 };
+const textOn = hex => {          // dunkle oder helle Schrift je nach Hintergrund
+  const n = parseInt(String(hex).slice(1), 16);
+  if (isNaN(n)) return '#FFFFFF';
+  return ((n >> 16 & 255) * 0.299 + (n >> 8 & 255) * 0.587 + (n & 255) * 0.114) / 255 > 0.62 ? '#1D2433' : '#FFFFFF';
+};
+const dayDiff = (a, b) => Math.round((parseYmd(b) - parseYmd(a)) / 86400000);
+function fmtRange(a, b) {
+  const da = parseYmd(a), db = parseYmd(b);
+  const sameYear = da.getFullYear() === db.getFullYear();
+  const left = da.toLocaleDateString('de-DE', sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+  return left + ' – ' + db.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: sameYear && db.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+}
 const count = (c, one, many) => `${c === 0 ? 'keine' : c} ${c === 1 ? one : many}`;
 
 function dueLabel(s) {
@@ -733,7 +773,12 @@ async function refreshCalendars(force) {
 /* Alle sichtbaren Einträge eines Tages, gemischt aus Dashboard und Google */
 function entriesOn(ds) {
   const s = data.settings, out = [];
-  if (s.showOwn) for (const e of data.events) if (e.date === ds) out.push({ kind: 'own', id: e.id, title: e.title, time: e.time || '', endTime: e.time ? (e.end || '') : '', note: e.note || '', color: s.ownColor });
+  if (s.showOwn) for (const e of data.events) {
+    const end = e.endDate || e.date;
+    if (e.date <= ds && ds <= end)
+      out.push({ kind: 'own', id: e.id, title: e.title, time: e.date === ds ? (e.time || '') : '', endTime: e.date === ds && end === ds ? (e.end || '') : '',
+                 note: e.note || '', color: s.ownColor, start: e.date, end });
+  }
   for (const c of s.gcals) {
     if (!isActive(c) || !gcache[c.id]) continue;
     const seen = new Set();
@@ -743,12 +788,35 @@ function entriesOn(ds) {
       for (const e of block.items) {
         if (e.date <= ds && ds <= e.endDate && !seen.has(e.id)) {
           seen.add(e.id);
-          out.push({ kind: 'google', id: e.id, title: e.title, time: e.date === ds ? e.time : '', endTime: e.date === ds ? e.endTime : '', location: e.location, link: e.link, cal: c, color: colorOf(c) });
+          out.push({ kind: 'google', id: e.id, title: e.title, time: e.date === ds ? e.time : '', endTime: e.date === ds ? e.endTime : '', location: e.location, link: e.link, cal: c, color: colorOf(c), start: e.date, end: e.endDate });
         }
       }
     }
   }
   out.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  return out;
+}
+/* Alle Einträge, die einen Zeitraum berühren (für die Balken im Monatskalender) */
+function itemsBetween(a, b) {
+  const s = data.settings, out = [];
+  if (s.showOwn) for (const e of data.events) {
+    const end = e.endDate || e.date;
+    if (e.date <= b && end >= a) out.push({ kind: 'own', title: e.title, time: e.time || '', start: e.date, end, color: s.ownColor });
+  }
+  for (const c of s.gcals) {
+    if (!isActive(c) || !gcache[c.id]) continue;
+    const seen = new Set();
+    for (const ym of new Set([addMonths(a.slice(0, 7), -1), a.slice(0, 7), b.slice(0, 7)])) {
+      const block = gcache[c.id][ym];
+      if (!block) continue;
+      for (const e of block.items) if (e.date <= b && e.endDate >= a && !seen.has(e.id)) {
+        seen.add(e.id);
+        out.push({ kind: 'google', title: e.title, time: e.time, start: e.date, end: e.endDate, color: colorOf(c) });
+      }
+    }
+  }
+  if (s.showTodos) for (const x of data.todos)
+    if (!x.done && x.due && x.due >= a && x.due <= b) out.push({ kind: 'todo', title: x.title, time: '', start: x.due, end: x.due, color: s.todoColor });
   return out;
 }
 const todosOn = ds => data.settings.showTodos ? data.todos.filter(x => !x.done && x.due === ds) : [];
@@ -821,7 +889,7 @@ const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.c
 /* Eintrag als Zeile (Übersicht, Tagesansicht) */
 function entryRow(e, when) {
   const dot = `<span class="cdot" style="--c:${esc(e.color)}"></span>`;
-  const sub = [e.kind === 'google' ? e.cal.name : 'Dashboard', e.location || e.note].filter(Boolean).join(', ');
+  const sub = [e.kind === 'google' ? e.cal.name : 'Dashboard', e.start && e.end && e.start !== e.end ? fmtRange(e.start, e.end) : '', e.location || e.note].filter(Boolean).join(', ');
   const attrs = e.kind === 'google'
     ? `data-act="gevent-open" data-link="${esc(e.link)}"`
     : `data-act="event-edit" data-id="${esc(e.id)}"`;
@@ -846,9 +914,15 @@ function renderHome() {
     : `<p class="empty">Nichts fällig.</p><div class="row"><button class="btn small" data-act="goto" data-view="todos" data-focus="#todoForm [name=text]">Aufgabe anlegen</button></div>`;
 
   const rows = [];
+  const shown = new Set();
   for (let i = 0; i <= 14 && rows.length < 8; i++) {
     const ds = addDays(t, i);
-    for (const e of entriesOn(ds)) rows.push(entryRow(e, esc(dueLabel(ds)) + (e.time ? '<br>' + esc(e.time) : '')));
+    for (const e of entriesOn(ds)) {
+      const key = e.kind + ':' + (e.cal ? e.cal.id : '') + ':' + e.id;
+      if (shown.has(key)) continue;
+      shown.add(key);
+      rows.push(entryRow(e, esc(dueLabel(ds)) + (e.time ? '<br>' + esc(e.time) : '')));
+    }
   }
   $('#homeEvents').innerHTML = rows.length
     ? `<ul class="mini">${rows.slice(0, 8).join('')}</ul>`
@@ -902,22 +976,48 @@ function renderCal() {
   const [y, m] = ui.calMonth.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
   const offset = (first.getDay() + 6) % 7;
-  const cells = Math.ceil((offset + new Date(y, m, 0).getDate()) / 7) * 7;
+  const weeks = Math.ceil((offset + new Date(y, m, 0).getDate()) / 7);
   const t = todayStr();
+  const MAXL = 5;                                    // so viele Zeilen pro Woche, danach „+n“
   $('#calTitle').textContent = monthName(ui.calMonth);
-  let h = ['KW','Mo','Di','Mi','Do','Fr','Sa','So'].map(d => `<div class="cal-wd">${d}</div>`).join('');
-  for (let i = 0; i < cells; i++) {
-    const d = new Date(y, m - 1, 1 - offset + i), ds = ymd(d);
-    if (i % 7 === 0) h += `<div class="cal-kw" aria-label="Kalenderwoche ${isoWeek(d)}">${isoWeek(d)}</div>`;
-    const all = [
-      ...entriesOn(ds).map(e => `<span class="ci g" style="--c:${esc(e.color)}">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`),
-      ...todosOn(ds).map(x => `<span class="ci td" style="--c:${esc(s.todoColor)}">${esc(x.title)}</span>`)
-    ];
-    const cls = ['cal-cell', d.getMonth() !== m - 1 ? 'out' : '', ds === t ? 'today' : '', ds === ui.calDay ? 'sel' : ''].join(' ');
-    const label = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (all.length ? `, ${all.length} Einträge` : '');
-    h += `<button class="${cls}" data-act="cal-day" data-d="${ds}" aria-label="${esc(label)}"><span class="dnum">${d.getDate()}</span><span class="items">${all.slice(0, 3).join('')}${all.length > 3 ? `<span class="ci more">+${all.length - 3}</span>` : ''}</span></button>`;
+  let h = `<div class="cal-head">${['KW','Mo','Di','Mi','Do','Fr','Sa','So'].map(d => `<div class="cal-wd">${d}</div>`).join('')}</div><div class="cal-body">`;
+  for (let w = 0; w < weeks; w++) {
+    const ws = ymd(new Date(y, m - 1, 1 - offset + w * 7)), we = addDays(ws, 6);
+    // Einträge auf die Woche zuschneiden und in Zeilen verteilen (mehrtägige zuerst)
+    const segs = itemsBetween(ws, we).map(it => ({ ...it,
+      c0: Math.max(0, dayDiff(ws, it.start)), c1: Math.min(6, dayDiff(ws, it.end)),
+      contL: it.start < ws, contR: it.end > we }));
+    const rank = x => x.kind === 'todo' ? 2 : x.time ? 1 : 0;
+    segs.sort((p, q) => (q.c1 - q.c0) - (p.c1 - p.c0) || p.c0 - q.c0 || rank(p) - rank(q) || (p.time || '').localeCompare(q.time || ''));
+    const lanes = [];
+    for (const sg of segs) {
+      let l = 0;
+      while (lanes[l] && lanes[l].slice(sg.c0, sg.c1 + 1).some(Boolean)) l++;
+      lanes[l] = lanes[l] || Array(7).fill(false);
+      for (let c = sg.c0; c <= sg.c1; c++) lanes[l][c] = true;
+      sg.lane = l;
+    }
+    const visible = lanes.length <= MAXL ? lanes.length : MAXL - 1;
+    const hidden = Array(7).fill(0);
+    let row = `<div class="cal-week" style="--lanes:${Math.max(visible, 1)}">`;
+    row += `<div class="cal-kw" aria-label="Kalenderwoche ${isoWeek(parseYmd(ws))}">${isoWeek(parseYmd(ws))}</div>`;
+    for (let c = 0; c < 7; c++) {
+      const ds = addDays(ws, c), d = parseYmd(ds);
+      const n = segs.filter(sg => sg.c0 <= c && c <= sg.c1).length;
+      const cls = ['cal-cell', d.getMonth() !== m - 1 ? 'out' : '', ds === t ? 'today' : '', ds === ui.calDay ? 'sel' : ''].join(' ');
+      const label = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (n ? `, ${n} Einträge` : '');
+      row += `<button class="${cls}" style="grid-column:${c + 2}" data-act="cal-day" data-d="${ds}" aria-label="${esc(label)}"><span class="dnum">${d.getDate()}</span></button>`;
+    }
+    for (const sg of segs) {
+      if (sg.lane >= visible) { for (let c = sg.c0; c <= sg.c1; c++) hidden[c]++; continue; }
+      const showTime = sg.time && !sg.contL;
+      const cls = ['cbar', sg.kind === 'todo' ? 'todo' : '', sg.contL ? 'cont-l' : '', sg.contR ? 'cont-r' : ''].join(' ');
+      row += `<div class="${cls}" aria-hidden="true" style="grid-row:${sg.lane + 2};grid-column:${sg.c0 + 2} / ${sg.c1 + 3};--c:${esc(sg.color)};--t:${textOn(sg.color)}">${showTime ? esc(sg.time) + ' ' : ''}${esc(sg.title)}</div>`;
+    }
+    hidden.forEach((n, c) => { if (n) row += `<div class="cal-more" aria-hidden="true" style="grid-row:${visible + 2};grid-column:${c + 2}">+${n} weitere</div>`; });
+    h += row + '</div>';
   }
-  $('#calGrid').innerHTML = h;
+  $('#calGrid').innerHTML = h + '</div>';
 
   $('#dayTitle').textContent = parseYmd(ui.calDay).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ', KW ' + isoWeek(parseYmd(ui.calDay));
   const evs = entriesOn(ui.calDay), tds = todosOn(ui.calDay);
@@ -986,9 +1086,10 @@ function fieldHtml(f) {
   const id = 'f_' + f.name;
   let input;
   if (f.type === 'textarea') input = `<textarea id="${id}" name="${f.name}" rows="3">${esc(f.value)}</textarea>`;
+  else if (f.type === 'checkbox') return `<div class="field"><label class="chk"><input type="checkbox" id="${id}" name="${f.name}" value="1"${f.value ? ' checked' : ''}> ${esc(f.label)}</label></div>`;
   else if (f.type === 'select') input = `<select id="${id}" name="${f.name}">${f.options.map(o => `<option value="${esc(o.value)}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
   else input = `<input id="${id}" name="${f.name}" type="${f.type || 'text'}" value="${esc(f.value)}"${f.required ? ' required' : ''}${f.list ? ` list="${f.list}"` : ''}${f.inputmode ? ` inputmode="${f.inputmode}"` : ''}>`;
-  return `<div class="field"><label for="${id}">${esc(f.label)}</label>${input}</div>`;
+  return `<div class="field${f.half ? ' half' : ''}"><label for="${id}">${esc(f.label)}</label>${input}</div>`;
 }
 function openDialog({ title, fields, onSave, onDelete }) {
   dlgState = { onSave, onDelete };
@@ -1026,17 +1127,27 @@ function editEvent(id, date) {
   const lastTarget = options.some(o => o.value === meta.lastTarget) ? meta.lastTarget : 'dashboard';
   const fields = [{ name: 'text', label: 'Titel', value: ev && ev.title, required: true }];
   if (targets.length) fields.push({ name: 'target', label: 'Eintragen in', type: 'select', value: ev ? 'dashboard' : lastTarget, options });
-  fields.push({ name: 'date', label: 'Datum', type: 'date', value: (ev && ev.date) || date || todayStr(), required: true },
-              { name: 'time', label: 'Beginn (leer = ganztägig)', type: 'time', value: ev && ev.time },
-              { name: 'end', label: 'Ende (optional)', type: 'time', value: ev && ev.end },
+  const startDate = (ev && ev.date) || date || todayStr();
+  const nextHour = `${pad(Math.min(new Date().getHours() + 1, 23))}:00`;
+  const startTime = ev ? (ev.time || nextHour) : nextHour;
+  fields.push({ name: 'allday', label: 'Ganztägig', type: 'checkbox', value: ev ? !ev.time : false },
+              { name: 'date', label: 'Beginn', type: 'date', value: startDate, required: true, half: true },
+              { name: 'time', label: 'Uhrzeit', type: 'time', value: startTime, half: true },
+              { name: 'endDate', label: 'Ende', type: 'date', value: (ev && ev.endDate) || startDate, required: true, half: true },
+              { name: 'end', label: 'Uhrzeit', type: 'time', value: ev ? (ev.end || plusHour(startTime)) : plusHour(startTime), half: true },
               { name: 'note', label: 'Notiz', type: 'textarea', value: ev && ev.note });
   openDialog({
     title: ev ? 'Termin bearbeiten' : 'Neuer Termin',
     fields,
     onSave: v => {
-      const rec = { title: v.text.trim(), date: v.date, time: v.time || '', end: v.time ? (v.end || '') : '', note: (v.note || '').trim() };
+      const allDay = !!v.allday;
+      const rec = { title: v.text.trim(), date: v.date, endDate: v.endDate || v.date,
+                    time: allDay ? '' : (v.time || ''), end: allDay ? '' : (v.end || ''), note: (v.note || '').trim() };
       if (!rec.title || !rec.date) return false;
-      if (rec.end && rec.end <= rec.time) { toast('Das Ende muss nach dem Beginn liegen.'); return false; }
+      if (!allDay && !rec.time) { toast('Bitte eine Uhrzeit angeben oder „Ganztägig“ wählen.'); return false; }
+      if (rec.endDate < rec.date) { toast('Das Ende liegt vor dem Beginn.'); return false; }
+      if (!allDay && !rec.end) rec.end = rec.endDate === rec.date ? plusHour(rec.time) : rec.time;
+      if (!allDay && rec.endDate === rec.date && rec.end <= rec.time) { toast('Das Ende muss nach dem Beginn liegen.'); return false; }
       const target = v.target || 'dashboard';
       if (!ev) { meta.lastTarget = target; saveMeta(); }
       ui.calDay = rec.date; ui.calMonth = rec.date.slice(0, 7);
@@ -1049,6 +1160,29 @@ function editEvent(id, date) {
     },
     onDelete: ev ? () => { data.events = data.events.filter(x => x !== ev); commit(); } : null
   });
+  const f = n => $(`#dlgBody [name=${n}]`);
+  const syncAllDay = () => ['time', 'end'].forEach(n => { f(n).closest('.field').style.visibility = f('allday').checked ? 'hidden' : ''; });
+  f('allday').addEventListener('change', syncAllDay);
+  let lastStart = f('date').value;
+  f('date').addEventListener('change', () => {       // Ende verschiebt sich mit dem Beginn, wie in Google
+    if (!f('date').value) return;
+    const shift = dayDiff(lastStart, f('date').value);
+    f('endDate').value = addDays(f('endDate').value || lastStart, shift);
+    if (f('endDate').value < f('date').value) f('endDate').value = f('date').value;
+    lastStart = f('date').value;
+  });
+  const toMin = t => { const [h, mm] = t.split(':').map(Number); return h * 60 + mm; };
+  const fromMin = n => { n = Math.min(Math.max(n, 0), 23 * 60 + 59); return `${pad(Math.floor(n / 60))}:${pad(n % 60)}`; };
+  let lastTime = f('time').value;
+  f('time').addEventListener('change', () => {       // Dauer beibehalten, wenn der Beginn verschoben wird
+    if (!f('time').value) return;
+    if (f('endDate').value === f('date').value) {
+      const dur = lastTime && f('end').value ? toMin(f('end').value) - toMin(lastTime) : 60;
+      f('end').value = fromMin(toMin(f('time').value) + Math.max(dur, 15));
+    }
+    lastTime = f('time').value;
+  });
+  syncAllDay();
 }
 /* Termin in einen Google-Kalender schreiben. Gibt true zurück, wenn es geklappt hat. */
 async function createGoogleEvent(calId, rec) {
@@ -1066,10 +1200,10 @@ async function createGoogleEvent(calId, rec) {
   if (rec.note) body.description = rec.note;
   if (rec.time) {
     body.start = { dateTime: `${rec.date}T${rec.time}:00`, timeZone: tz };
-    body.end = { dateTime: `${rec.date}T${rec.end || plusHour(rec.time)}:00`, timeZone: tz };
+    body.end = { dateTime: `${rec.endDate || rec.date}T${rec.end || plusHour(rec.time)}:00`, timeZone: tz };
   } else {
     body.start = { date: rec.date };
-    body.end = { date: addDays(rec.date, 1) };
+    body.end = { date: addDays(rec.endDate || rec.date, 1) };
   }
   try {
     await api(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
