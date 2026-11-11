@@ -219,6 +219,7 @@ dialog h2{margin:0 0 14px;font-size:18px}
 .gtog:has(input:not(:checked)) .dot{background:transparent;box-shadow:inset 0 0 0 2px var(--muted)}
 .gtog:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 .cal-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ci.td{box-shadow:inset 0 0 0 1px var(--line),inset 3px 0 0 var(--c)}
 .ci.g{background:color-mix(in srgb,var(--c) 24%,var(--surface));box-shadow:inset 3px 0 0 var(--c);color:var(--ink)}
 .cdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);margin-right:6px;vertical-align:baseline;flex:none}
 .sub{display:block;font-size:12.5px;color:var(--muted)}
@@ -228,7 +229,8 @@ dialog h2{margin:0 0 14px;font-size:18px}
 .set-row label{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer}
 .set-row input{width:auto;margin:0}
 @media (max-width:640px){
-  .ci.g{background:var(--c);box-shadow:none}
+  .ci.td{box-shadow:inset 0 0 0 1px var(--line),inset 3px 0 0 var(--c)}
+.ci.g{background:var(--c);box-shadow:none}
 }
 
 </style>
@@ -302,7 +304,7 @@ dialog h2{margin:0 0 14px;font-size:18px}
         </div>
         <div class="cal-grid" id="calGrid"></div>
         <section class="panel day-panel">
-          <div class="panel-head"><h2 id="dayTitle"></h2><button class="btn small primary" data-act="event-new">Termin hinzufügen</button></div>
+          <div class="panel-head"><h2 id="dayTitle"></h2><div class="row" style="margin:0"><button class="btn small" data-act="gcal-open">In Google Kalender öffnen</button><button class="btn small primary" data-act="event-new">Termin hinzufügen</button></div></div>
           <div id="dayList"></div>
         </section>
       </section>
@@ -340,7 +342,7 @@ dialog h2{margin:0 0 14px;font-size:18px}
         <section class="panel"><h2>Google-Konto und Synchronisation</h2><div id="setSync"></div></section>
         <section class="panel">
           <h2>Google-Kalender</h2>
-          <p class="muted">Hier erscheinen automatisch alle Kalender aus deinem Google-Konto, auch abonnierte und mit dir geteilte. Neue Kalender legst du in Google an, sie tauchen beim nächsten Aktualisieren auf.</p>
+          <p class="muted">Hier erscheinen automatisch alle Kalender aus deinem Google-Konto, auch abonnierte und mit dir geteilte. Tippe auf das Farbfeld, um eine eigene Farbe zu wählen. Kalender ohne Haken bei „Anzeigen“ tauchen im Kalender gar nicht auf, auch nicht als Schalter.</p>
           <div id="gcalList"></div>
         </section>
         <section class="panel">
@@ -378,6 +380,7 @@ dialog h2{margin:0 0 14px;font-size:18px}
 /* ---------- Einstellungen der App ---------- */
 const GOOGLE_CLIENT_ID = '516131034071-1kqsvgrhjkgo0io7jpkqe9pqonnq7rhm.apps.googleusercontent.com';
 const SCOPE_CAL = 'https://www.googleapis.com/auth/calendar.readonly';
+const SCOPE_EVENTS = 'https://www.googleapis.com/auth/calendar.events';   // Termine in Google eintragen
 const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive.file';   // nur Dateien, die das Dashboard selbst anlegt
 const DRIVE_FOLDER = 'Dashboard';
 const DRIVE_FILE = 'dashboard-daten.json';
@@ -431,7 +434,7 @@ function parseAmount(s) {
 /* ---------- Daten ---------- */
 function emptyData() {
   return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
-           settings: { gcals: [], showOwn: true, showTodos: true, categories: [...DEFAULT_CATS] } };
+           settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS] } };
 }
 function normalize(d) {
   const e = emptyData();
@@ -439,7 +442,10 @@ function normalize(d) {
   const s = Object.assign(e.settings, d.settings || {});
   if (!Array.isArray(s.categories)) s.categories = [...DEFAULT_CATS];
   if (!Array.isArray(s.gcals)) s.gcals = [];
-  s.gcals = s.gcals.filter(c => c && c.id).map(c => ({ id: c.id, name: c.name || c.id, color: c.color || '#039BE5', on: c.on !== false }));
+  s.gcals = s.gcals.filter(c => c && c.id).map(c => ({ id: c.id, name: c.name || c.id, color: c.color || '#039BE5',
+    userColor: c.userColor || '', on: c.on !== false, listed: c.listed !== false, role: c.role || '' }));
+  if (!/^#[0-9a-f]{6}$/i.test(s.ownColor || '')) s.ownColor = '#3B5BA5';
+  if (!/^#[0-9a-f]{6}$/i.test(s.todoColor || '')) s.todoColor = '#7A8290';
   delete s.gcalSrc; delete s.gcalMode;                 // aus der Version mit eingebettetem Google-Kalender
   if (typeof s.showOwn !== 'boolean') s.showOwn = true;
   if (typeof s.showTodos !== 'boolean') s.showTodos = true;
@@ -451,6 +457,9 @@ function normalize(d) {
 }
 function lsGet(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fallback; } catch { return fallback; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn(e); } }
+const colorOf = c => c.userColor || c.color;
+const isActive = c => c.listed && c.on;
+const writable = c => c.listed && (c.role === 'owner' || c.role === 'writer');
 const hasContent = d => d.todos.length || d.events.length || d.finance.length;
 
 let data = normalize(lsGet(LS_DATA, null));
@@ -480,6 +489,7 @@ function replaceData(d) {
 class AuthError extends Error { constructor() { super('Nicht mit Google verbunden'); this.name = 'AuthError'; } }
 const auth = Object.assign({ token: null, exp: 0 }, lsGet(LS_TOKEN, {}), { error: null });
 const signedIn = () => !!auth.token && Date.now() < auth.exp;
+const canWrite = () => Array.isArray(meta.scopes) && meta.scopes.includes(SCOPE_EVENTS);
 const REDIRECT_URI = location.origin + location.pathname.replace(/index\.html$/, '');
 
 /* Anmeldung per Weiterleitung zu Google (zuverlässiger als ein Popup, auch in der installierten App) */
@@ -488,9 +498,9 @@ function signIn() {
   lsSet('dashboard.oauthState', state);
   const p = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: 'token',
-    scope: SCOPE_CAL + ' ' + SCOPE_DRIVE, include_granted_scopes: 'true', state
+    scope: [SCOPE_CAL, SCOPE_EVENTS, SCOPE_DRIVE].join(' '), include_granted_scopes: 'true', state
   });
-  if (!meta.consented) p.set('prompt', 'consent');
+  if (!meta.consented || !canWrite()) p.set('prompt', 'consent');
   location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + p.toString());
 }
 /* Rückkehr von Google: Zugang aus der Adresse lesen und die Adresse wieder säubern */
@@ -514,7 +524,7 @@ function handleRedirect() {
   const granted = (h.get('scope') || '').split(' ');
   if (!granted.includes(SCOPE_CAL) || !granted.includes(SCOPE_DRIVE))
     setTimeout(() => toast('Bitte beim Anmelden beide Häkchen setzen: Kalender ansehen und Drive-Dateien des Dashboards.'), 300);
-  meta.consented = true; saveMeta();
+  meta.consented = true; meta.scopes = granted; saveMeta();
   return true;
 }
 function signOut() {
@@ -660,8 +670,9 @@ async function loadCalendarList() {
     const name = it.summaryOverride || it.summary || it.id;
     const color = it.backgroundColor || '#039BE5';
     const ex = g.find(c => c.id === it.id);
-    if (!ex) { g.push({ id: it.id, name, color, on: it.selected === true }); changed = true; }
-    else if (ex.name !== name || ex.color !== color) { ex.name = name; ex.color = color; changed = true; }
+    const role = it.accessRole || '';
+    if (!ex) { g.push({ id: it.id, name, color, userColor: '', on: it.selected === true, listed: true, role }); changed = true; }
+    else if (ex.name !== name || ex.color !== color || ex.role !== role) { ex.name = name; ex.color = color; ex.role = role; changed = true; }
   }
   if (changed) commit();
 }
@@ -673,10 +684,11 @@ function mapEvent(e) {
   } else {
     const s = new Date(e.start.dateTime), en = e.end && e.end.dateTime ? new Date(e.end.dateTime) : s;
     date = ymd(s); time = `${pad(s.getHours())}:${pad(s.getMinutes())}`;
+    var endTime = `${pad(en.getHours())}:${pad(en.getMinutes())}`;
     endDate = ymd(new Date(Math.max(s.getTime(), en.getTime() - 1)));
   }
   if (endDate < date) endDate = date;
-  return { id: e.id, title: e.summary || '(ohne Titel)', date, endDate, time, location: e.location || '', link: e.htmlLink || '' };
+  return { id: e.id, title: e.summary || '(ohne Titel)', date, endDate, time, endTime: time && endDate === date ? endTime : '', location: e.location || '', link: e.htmlLink || '' };
 }
 async function fetchMonth(calId, ym) {
   const [y, m] = ym.split('-').map(Number);
@@ -702,7 +714,7 @@ async function refreshCalendars(force) {
   try {
     if (force || !cal.listLoaded) { await loadCalendarList(); cal.listLoaded = true; }
     const jobs = [];
-    for (const c of data.settings.gcals.filter(c => c.on))
+    for (const c of data.settings.gcals.filter(isActive))
       for (const ym of neededMonths()) {
         const hit = gcache[c.id] && gcache[c.id][ym];
         if (force || !hit || Date.now() - hit.at > 5 * 60 * 1000)
@@ -721,9 +733,9 @@ async function refreshCalendars(force) {
 /* Alle sichtbaren Einträge eines Tages, gemischt aus Dashboard und Google */
 function entriesOn(ds) {
   const s = data.settings, out = [];
-  if (s.showOwn) for (const e of data.events) if (e.date === ds) out.push({ kind: 'own', id: e.id, title: e.title, time: e.time || '', note: e.note || '' });
+  if (s.showOwn) for (const e of data.events) if (e.date === ds) out.push({ kind: 'own', id: e.id, title: e.title, time: e.time || '', endTime: e.time ? (e.end || '') : '', note: e.note || '', color: s.ownColor });
   for (const c of s.gcals) {
-    if (!c.on || !gcache[c.id]) continue;
+    if (!isActive(c) || !gcache[c.id]) continue;
     const seen = new Set();
     for (const ym of [ds.slice(0, 7), addMonths(ds.slice(0, 7), -1)]) {
       const block = gcache[c.id][ym];
@@ -731,7 +743,7 @@ function entriesOn(ds) {
       for (const e of block.items) {
         if (e.date <= ds && ds <= e.endDate && !seen.has(e.id)) {
           seen.add(e.id);
-          out.push({ kind: 'google', id: e.id, title: e.title, time: e.date === ds ? e.time : '', location: e.location, link: e.link, cal: c });
+          out.push({ kind: 'google', id: e.id, title: e.title, time: e.date === ds ? e.time : '', endTime: e.date === ds ? e.endTime : '', location: e.location, link: e.link, cal: c, color: colorOf(c) });
         }
       }
     }
@@ -808,7 +820,7 @@ const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.c
 
 /* Eintrag als Zeile (Übersicht, Tagesansicht) */
 function entryRow(e, when) {
-  const dot = e.kind === 'google' ? `<span class="cdot" style="--c:${esc(e.cal.color)}"></span>` : `<span class="cdot" style="--c:var(--event)"></span>`;
+  const dot = `<span class="cdot" style="--c:${esc(e.color)}"></span>`;
   const sub = [e.kind === 'google' ? e.cal.name : 'Dashboard', e.location || e.note].filter(Boolean).join(', ');
   const attrs = e.kind === 'google'
     ? `data-act="gevent-open" data-link="${esc(e.link)}"`
@@ -883,9 +895,9 @@ function renderCal() {
   const s = data.settings;
   renderCalState();
   $('#calToggles').innerHTML =
-    `<label class="gtog" style="--c:var(--event)"><input type="checkbox" data-vis="showOwn"${s.showOwn ? ' checked' : ''}><span class="dot"></span>Dashboard-Termine</label>` +
-    `<label class="gtog" style="--c:var(--muted)"><input type="checkbox" data-vis="showTodos"${s.showTodos ? ' checked' : ''}><span class="dot"></span>Aufgaben</label>` +
-    s.gcals.map((c, i) => `<label class="gtog" style="--c:${esc(c.color)}" title="${esc(cal.errors[c.id] || '')}"><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}><span class="dot"></span>${esc(c.name)}${cal.errors[c.id] ? ' (Fehler)' : ''}</label>`).join('');
+    `<label class="gtog" style="--c:${esc(s.ownColor)}"><input type="checkbox" data-vis="showOwn"${s.showOwn ? ' checked' : ''}><span class="dot"></span>Dashboard-Termine</label>` +
+    `<label class="gtog" style="--c:${esc(s.todoColor)}"><input type="checkbox" data-vis="showTodos"${s.showTodos ? ' checked' : ''}><span class="dot"></span>Aufgaben</label>` +
+    s.gcals.map((c, i) => !c.listed ? '' : `<label class="gtog" style="--c:${esc(colorOf(c))}" title="${esc(cal.errors[c.id] || '')}"><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}><span class="dot"></span>${esc(c.name)}${cal.errors[c.id] ? ' (Fehler)' : ''}</label>`).join('');
 
   const [y, m] = ui.calMonth.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
@@ -898,10 +910,8 @@ function renderCal() {
     const d = new Date(y, m - 1, 1 - offset + i), ds = ymd(d);
     if (i % 7 === 0) h += `<div class="cal-kw" aria-label="Kalenderwoche ${isoWeek(d)}">${isoWeek(d)}</div>`;
     const all = [
-      ...entriesOn(ds).map(e => e.kind === 'google'
-        ? `<span class="ci g" style="--c:${esc(e.cal.color)}">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`
-        : `<span class="ci ev">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`),
-      ...todosOn(ds).map(x => `<span class="ci td">${esc(x.title)}</span>`)
+      ...entriesOn(ds).map(e => `<span class="ci g" style="--c:${esc(e.color)}">${e.time ? esc(e.time) + ' ' : ''}${esc(e.title)}</span>`),
+      ...todosOn(ds).map(x => `<span class="ci td" style="--c:${esc(s.todoColor)}">${esc(x.title)}</span>`)
     ];
     const cls = ['cal-cell', d.getMonth() !== m - 1 ? 'out' : '', ds === t ? 'today' : '', ds === ui.calDay ? 'sel' : ''].join(' ');
     const label = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + (all.length ? `, ${all.length} Einträge` : '');
@@ -912,7 +922,7 @@ function renderCal() {
   $('#dayTitle').textContent = parseYmd(ui.calDay).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ', KW ' + isoWeek(parseYmd(ui.calDay));
   const evs = entriesOn(ui.calDay), tds = todosOn(ui.calDay);
   let dl = '';
-  if (evs.length) dl += `<ul class="mini">${evs.map(e => entryRow(e, e.time ? esc(e.time) : 'ganztägig')).join('')}</ul>`;
+  if (evs.length) dl += `<ul class="mini">${evs.map(e => entryRow(e, e.time ? esc(e.time) + (e.endTime ? '–' + esc(e.endTime) : '') : 'ganztägig')).join('')}</ul>`;
   if (tds.length) dl += `<h3 class="group-label">Aufgaben</h3><ul class="todos">${tds.map(todoItem).join('')}</ul>`;
   $('#dayList').innerHTML = dl || '<p class="empty">Nichts geplant.</p>';
 }
@@ -959,10 +969,14 @@ function renderSettings() {
   h += `<p class="muted">Auf diesem Gerät: ${data.todos.length} Aufgaben, ${data.events.length} eigene Termine, ${data.finance.length} Buchungen. Stand ${fmtDateTime(data.updatedAt)}.</p>`;
   $('#setSync').innerHTML = h;
 
-  const g = data.settings.gcals;
-  $('#gcalList').innerHTML = g.length
-    ? g.map((c, i) => `<div class="set-row"><span class="cdot" style="--c:${esc(c.color)}"></span><span class="name">${esc(c.name)}${cal.errors[c.id] ? `<span class="sub">Fehler: ${esc(cal.errors[c.id])}</span>` : ''}</span><label><input type="checkbox" data-gcal="${i}"${c.on ? ' checked' : ''}>Anzeigen</label></div>`).join('')
-    : `<p class="empty">${signedIn() ? 'Noch keine Kalender geladen.' : 'Nach der Anmeldung erscheinen hier deine Kalender.'}</p>`;
+  const st = data.settings, g = st.gcals;
+  const colorIn = (attr, val, label) => `<input type="color" ${attr} value="${esc(val)}" aria-label="Farbe für ${esc(label)}" class="swatch">`;
+  let gl = `<div class="set-row">${colorIn('data-color-key="ownColor"', st.ownColor, 'Dashboard-Termine')}<span class="name">Dashboard-Termine<span class="sub">Termine, die nur im Dashboard gespeichert sind</span></span></div>
+            <div class="set-row">${colorIn('data-color-key="todoColor"', st.todoColor, 'Aufgaben')}<span class="name">Aufgaben<span class="sub">Fällige Aufgaben im Kalender</span></span></div>`;
+  gl += g.length
+    ? g.map((c, i) => `<div class="set-row${c.listed ? '' : ' off'}">${colorIn(`data-gcal-color="${i}"`, colorOf(c), c.name)}<span class="name">${esc(c.name)}${c.userColor ? ` <button class="link" data-act="gcal-color-reset" data-i="${i}">Google-Farbe</button>` : ''}${cal.errors[c.id] ? `<span class="sub">Fehler: ${esc(cal.errors[c.id])}</span>` : ''}</span><label><input type="checkbox" data-gcal-list="${i}"${c.listed ? ' checked' : ''}>Anzeigen</label></div>`).join('')
+    : `<p class="empty">${signedIn() ? 'Noch keine Google-Kalender geladen.' : 'Nach der Anmeldung erscheinen hier deine Google-Kalender.'}</p>`;
+  $('#gcalList').innerHTML = gl;
 }
 
 /* ---------- Dialog ---------- */
@@ -1003,24 +1017,80 @@ function editTodo(id) {
     onDelete: () => { data.todos = data.todos.filter(x => x !== t); commit(); }
   });
 }
+function plusHour(t) { const [h, m] = t.split(':').map(Number); return h >= 23 ? '23:59' : `${pad(h + 1)}:${pad(m)}`; }
 function editEvent(id, date) {
   const ev = id ? data.events.find(x => x.id === id) : null;
   if (id && !ev) return;
+  const targets = data.settings.gcals.filter(writable);
+  const options = [{ value: 'dashboard', label: 'Dashboard (nur in dieser App)' }, ...targets.map(c => ({ value: c.id, label: 'Google: ' + c.name }))];
+  const lastTarget = options.some(o => o.value === meta.lastTarget) ? meta.lastTarget : 'dashboard';
+  const fields = [{ name: 'text', label: 'Titel', value: ev && ev.title, required: true }];
+  if (targets.length) fields.push({ name: 'target', label: 'Eintragen in', type: 'select', value: ev ? 'dashboard' : lastTarget, options });
+  fields.push({ name: 'date', label: 'Datum', type: 'date', value: (ev && ev.date) || date || todayStr(), required: true },
+              { name: 'time', label: 'Beginn (leer = ganztägig)', type: 'time', value: ev && ev.time },
+              { name: 'end', label: 'Ende (optional)', type: 'time', value: ev && ev.end },
+              { name: 'note', label: 'Notiz', type: 'textarea', value: ev && ev.note });
   openDialog({
-    title: ev ? 'Termin bearbeiten' : 'Neuer Dashboard-Termin',
-    fields: [{ name: 'text', label: 'Titel', value: ev && ev.title, required: true },
-             { name: 'date', label: 'Datum', type: 'date', value: (ev && ev.date) || date || todayStr(), required: true },
-             { name: 'time', label: 'Uhrzeit (optional)', type: 'time', value: ev && ev.time },
-             { name: 'note', label: 'Notiz', type: 'textarea', value: ev && ev.note }],
+    title: ev ? 'Termin bearbeiten' : 'Neuer Termin',
+    fields,
     onSave: v => {
-      const rec = { title: v.text.trim(), date: v.date, time: v.time || '', note: (v.note || '').trim() };
+      const rec = { title: v.text.trim(), date: v.date, time: v.time || '', end: v.time ? (v.end || '') : '', note: (v.note || '').trim() };
       if (!rec.title || !rec.date) return false;
-      if (ev) Object.assign(ev, rec); else data.events.push({ id: uid(), created: new Date().toISOString(), ...rec });
+      if (rec.end && rec.end <= rec.time) { toast('Das Ende muss nach dem Beginn liegen.'); return false; }
+      const target = v.target || 'dashboard';
+      if (!ev) { meta.lastTarget = target; saveMeta(); }
       ui.calDay = rec.date; ui.calMonth = rec.date.slice(0, 7);
+      if (target !== 'dashboard') {
+        createGoogleEvent(target, rec).then(ok => { if (ok && ev) { data.events = data.events.filter(x => x !== ev); commit(); } });
+        return;
+      }
+      if (ev) Object.assign(ev, rec); else data.events.push({ id: uid(), created: new Date().toISOString(), ...rec });
       commit();
     },
     onDelete: ev ? () => { data.events = data.events.filter(x => x !== ev); commit(); } : null
   });
+}
+/* Termin in einen Google-Kalender schreiben. Gibt true zurück, wenn es geklappt hat. */
+async function createGoogleEvent(calId, rec) {
+  const c = data.settings.gcals.find(x => x.id === calId);
+  if (!signedIn() || !canWrite()) {
+    const why = signedIn() ? 'Damit das Dashboard Termine in Google eintragen darf, musst du einmal neu verbinden und den Kalenderzugriff erlauben.' : 'Die Google-Verbindung ist abgelaufen.';
+    if (confirm(why + ' Jetzt verbinden? Der Termin wird danach automatisch eingetragen.')) {
+      lsSet('dashboard.pendingEvent', { calId, rec });
+      signIn();
+    }
+    return false;
+  }
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
+  const body = { summary: rec.title };
+  if (rec.note) body.description = rec.note;
+  if (rec.time) {
+    body.start = { dateTime: `${rec.date}T${rec.time}:00`, timeZone: tz };
+    body.end = { dateTime: `${rec.date}T${rec.end || plusHour(rec.time)}:00`, timeZone: tz };
+  } else {
+    body.start = { date: rec.date };
+    body.end = { date: addDays(rec.date, 1) };
+  }
+  try {
+    await api(`${CAL_API}/calendars/${encodeURIComponent(calId)}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (c && !isActive(c)) { c.listed = true; c.on = true; commit(); }
+    await fetchMonth(calId, rec.date.slice(0, 7));
+    saveGcache();
+    renderCal(); renderHome();
+    toast(`Termin in „${c ? c.name : 'Google Kalender'}“ eingetragen`);
+    return true;
+  } catch (e) {
+    if (e.status === 403) { meta.scopes = []; saveMeta(); }
+    toast('Eintragen in Google fehlgeschlagen: ' + friendly(e));
+    return false;
+  }
+}
+async function runPendingEvent() {
+  const p = lsGet('dashboard.pendingEvent', null);
+  if (!p || !signedIn()) return;
+  localStorage.removeItem('dashboard.pendingEvent');
+  if (canWrite()) await createGoogleEvent(p.calId, p.rec);
+  else toast('Der Termin konnte nicht eingetragen werden, weil der Kalenderzugriff nicht erlaubt wurde.');
 }
 function addCategory(c) { c = (c || '').trim(); if (c && !data.settings.categories.includes(c)) data.settings.categories.push(c); }
 function editFin(id) {
@@ -1079,6 +1149,12 @@ document.addEventListener('click', async e => {
     case 'event-new': editEvent(null, ui.calDay); break;
     case 'event-edit': editEvent(d.id); break;
     case 'gevent-open': if (d.link) window.open(d.link, '_blank', 'noopener'); break;
+    case 'gcal-open': {
+      const [y, m, dd] = ui.calDay.split('-').map(Number);
+      window.open(`https://calendar.google.com/calendar/r/day/${y}/${m}/${dd}`, '_blank', 'noopener');
+      break;
+    }
+    case 'gcal-color-reset': { const c = data.settings.gcals[+d.i]; if (c) { c.userColor = ''; commit(); } break; }
     case 'fin-prev': ui.finMonth = addMonths(ui.finMonth, -1); renderFin(); break;
     case 'fin-next': ui.finMonth = addMonths(ui.finMonth, 1); renderFin(); break;
     case 'fin-type': ui.finType = d.t; renderFin(); break;
@@ -1094,6 +1170,17 @@ document.addEventListener('change', e => {
     if (c) { c.on = e.target.checked; commit(); if (c.on) refreshCalendars(false); }
     return;
   }
+  if (ds.gcalList !== undefined) {
+    const c = data.settings.gcals[+ds.gcalList];
+    if (c) { c.listed = e.target.checked; if (c.listed) c.on = true; commit(); if (c.listed) refreshCalendars(false); }
+    return;
+  }
+  if (ds.gcalColor !== undefined) {
+    const c = data.settings.gcals[+ds.gcalColor];
+    if (c) { c.userColor = e.target.value === c.color ? '' : e.target.value; commit(); }
+    return;
+  }
+  if (ds.colorKey) { data.settings[ds.colorKey] = e.target.value; commit(); return; }
   if (ds.todo) {
     const t = data.todos.find(x => x.id === ds.todo);
     if (!t) return;
@@ -1163,7 +1250,7 @@ $('#finForm').elements.namedItem('date').value = todayStr();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 handleRedirect();
 render();
-if (signedIn()) { syncData().then(() => refreshCalendars(true)); }
+if (signedIn()) { syncData().then(() => refreshCalendars(true)).then(runPendingEvent); }
 </script>
 </body>
 </html>
