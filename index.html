@@ -379,6 +379,17 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 @media (max-width:900px){ .h10-sum{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:640px){ .loan-grid{grid-template-columns:1fr} .nav button{font-size:10px} }
 
+/* Anstehende Fixkosten */
+.fix-total{margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:14px}
+.fix-total .total{border-top:0;padding-top:0}
+.fix-pend{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:16px;text-align:left;font:inherit;color:inherit;cursor:pointer;border-left:4px solid var(--warn)}
+.fix-pend:hover{border-color:var(--warn)}
+.fix-pend .t{flex:1;min-width:0}
+.fix-pend .c{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.fix-pend .amt{font-size:18px;font-weight:650}
+.fix-pend.done{cursor:default;border-left-color:var(--accent);color:var(--muted)}
+.iban-toggle.on{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+
 </style>
 </head>
 <body>
@@ -486,6 +497,7 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
             </div>
             <div class="fold-body"><div id="finCats"></div></div>
           </section>
+          <div id="fixPending"></div>
           <form id="ffPanel" class="panel ff-panel" autocomplete="off" hidden>
             <div class="field"><label for="ffCat">Kategorie</label><select id="ffCat" name="cat"></select></div>
             <div class="field"><label for="ffFixed">Fixkosten</label><select id="ffFixed" name="fixed"></select></div>
@@ -494,7 +506,7 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
             <div class="field"><label for="ffMax">Betrag bis €</label><input id="ffMax" name="max" inputmode="decimal" placeholder="beliebig"></div>
             <div class="field"><label for="ffFrom">Datum von</label><input id="ffFrom" name="from" type="date"></div>
             <div class="field"><label for="ffTo">Datum bis</label><input id="ffTo" name="to" type="date"></div>
-            <div class="ff-actions"><span id="ffInfo" class="muted"></span><button type="button" class="btn small" data-act="ff-reset">Filter zurücksetzen</button></div>
+            <div class="ff-actions"><span id="ffInfo" class="muted"></span><span class="row" style="margin:0"><button type="button" class="btn small iban-toggle" data-act="iban-toggle">IBAN einblenden</button><button type="button" class="btn small" data-act="ff-reset">Filter zurücksetzen</button></span></div>
             <datalist id="ffWhoList"></datalist>
           </form>
           <section class="panel fold" data-fold="list">
@@ -528,6 +540,7 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
           <div class="row" style="margin:0 0 16px">
             <button class="btn small primary" data-act="fix-new">Fixkosten hinzufügen</button>
             <button class="btn small" data-act="fix-detect">Aus Buchungen erkennen</button>
+            <button class="btn small iban-toggle" data-act="iban-toggle">IBAN einblenden</button>
           </div>
           <div class="fin-cols">
             <section class="panel">
@@ -734,6 +747,7 @@ function normalize(d) {
   const fixed = (Array.isArray(d.fixed) ? d.fixed : []).filter(x => x && x.id).map(x => ({
     id: x.id, name: x.name || 'Fixkosten', amount: Number(x.amount) || 0, interval: [1, 3, 6, 12, 24].includes(+x.interval) ? +x.interval : 1,
     accountId: accounts.some(a => a.id === x.accountId) ? x.accountId : accounts[0].id, cat: x.cat || '', match: x.match || '',
+    iban: (x.iban || '').replace(/\s/g, '').toUpperCase(),
     startDate: x.startDate || '', endDate: x.endDate || '', lastDate: x.lastDate || '', auto: !!x.auto, created: x.created || '' }));
   const h = d.h10 && typeof d.h10 === 'object' ? d.h10 : {};
   const arr = v => Array.isArray(v) ? v.filter(x => x && x.id) : [];
@@ -1329,11 +1343,15 @@ function renderFix() {
   $('#fixSum').innerHTML = `
     <div class="stat out"><span>Pro Monat umgerechnet</span><b>${eur.format(active.reduce((x, fx) => x + monthly(fx), 0))}</b></div>
     <div class="stat out"><span>Diesen Monat fällig</span><b>${eur.format(month.reduce((x, i) => x + i.amount, 0))}</b></div>
-    <div class="stat"><span>Davon noch offen</span><b>${eur.format(open.reduce((x, i) => x + i.amount, 0))}</b></div>`;
+    <div class="stat"><span>Noch anstehend</span><b>${eur.format(open.reduce((x, i) => x + i.amount, 0))}</b></div>`;
   $$('#fixRange button').forEach(b => b.setAttribute('aria-pressed', b.dataset.r === ui.fixRange));
   const items = ui.fixRange === 'month' ? month : fixedDue(t, addDays(t, 14), false);
   $('#fixUpcoming').innerHTML = items.length
-    ? items.map(it => fixRow(it, ui.fixRange === 'month')).join('') + `<p class="muted" style="margin-bottom:0">Summe ${eur.format(items.reduce((x, i) => x + i.amount, 0))}${ui.fixRange === 'month' ? `, davon offen ${eur.format(open.reduce((x, i) => x + i.amount, 0))}` : ''}</p>`
+    ? items.map(it => fixRow(it, ui.fixRange === 'month')).join('') + (ui.fixRange === 'month'
+        ? `<div class="money fix-total"><span>Schon gebucht</span><span class="amt">${eur.format(month.filter(x => x.booked).reduce((x, i) => x + i.amount, 0))}</span>
+           <span>Noch anstehend (${open.length})</span><span class="amt out">${eur.format(open.reduce((x, i) => x + i.amount, 0))}</span>
+           <span class="total">Fixkosten im Monat</span><span class="total amt">${eur.format(month.reduce((x, i) => x + i.amount, 0))}</span></div>`
+        : `<div class="money fix-total"><span class="total">Summe (${items.length})</span><span class="total amt out">${eur.format(items.reduce((x, i) => x + i.amount, 0))}</span></div>`)
     : `<p class="empty">${ui.fixRange === 'month' ? 'Diesen Monat sind keine Fixkosten fällig.' : 'In den nächsten 14 Tagen sind keine Fixkosten fällig.'}</p>`;
   const row = fx => {
     const nd = nextDue(fx), multi = data.accounts.length > 1 && ui.finAccount === 'all';
@@ -1341,7 +1359,7 @@ function renderFix() {
     const sub = [RHYTHM[fx.interval], multi ? accName(fx.accountId) : '', fx.cat,
                  fixedActive(fx) ? (nd ? 'nächste ' + dueLabel(nd) : '') : 'beendet ' + fmt(fx.endDate),
                  fx.endDate && fixedActive(fx) ? 'endet ' + fmt(fx.endDate) : '',
-                 fx.startDate && fx.startDate > t ? 'ab ' + fmt(fx.startDate) : ''].filter(Boolean).join(', ');
+                 fx.startDate && fx.startDate > t ? 'ab ' + fmt(fx.startDate) : '', meta.showIban && fx.iban ? 'IBAN ' + fmtIban(fx.iban) : ''].filter(Boolean).join(', ');
     return `<button class="fin-row${fixedActive(fx) ? '' : ' ended'}" data-act="fix-edit" data-id="${esc(fx.id)}"><span class="t">${esc(fx.name)}${fx.auto ? ' <span class="tag">erkannt</span>' : ''}<span class="c">${esc(sub)}</span></span><span class="amt out">−${eur.format(fx.amount)}</span></button>`;
   };
   const ended = list.filter(fx => !fixedActive(fx));
@@ -1404,16 +1422,18 @@ function renderFilter() {
     if (document.activeElement !== $('#' + id)) $('#' + id).value = F[k];
   $('#finMonthbar').classList.toggle('dim', !!ffRange());
 }
+const FOLD_DEFAULT = { cats: false };          // Ausgaben nach Kategorie startet eingeklappt
+const foldOpen = k => { meta.fold = meta.fold || {}; return k in meta.fold ? meta.fold[k] !== false : FOLD_DEFAULT[k] !== false; };
 function renderFolds() {
-  meta.fold = meta.fold || {};
   $$('.fold').forEach(el => {
-    const open = meta.fold[el.dataset.fold] !== false;
+    const open = foldOpen(el.dataset.fold);
     el.classList.toggle('closed', !open);
     $('.fold-btn', el).setAttribute('aria-expanded', open);
   });
 }
 function renderFin() {
   renderFolds();
+  $$('.iban-toggle').forEach(b => { b.textContent = meta.showIban ? 'IBAN ausblenden' : 'IBAN einblenden'; b.classList.toggle('on', !!meta.showIban); });
   $('#finMonthbar').hidden = ui.finTab !== 'buchungen';
   $('#finForm').hidden = !ui.fbOpen;
   $('#fbBtn').setAttribute('aria-expanded', ui.fbOpen);
@@ -1456,12 +1476,25 @@ function renderFin() {
     ? catRows.map(([c, v]) => `<div class="bar-row"><span>${esc(c)}</span><span class="amt">${eur.format(v)}</span><span class="bar"><i style="width:${max ? (v / max * 100).toFixed(1) : 0}%"></i></span></div>`).join('')
     : `<p class="empty">${ffActive() ? 'Keine passenden Ausgaben.' : 'Keine Ausgaben in diesem Monat.'}</p>`;
   const LIMIT = 300, withYear = !!ffRange();
+  {
+    const [yy, mm] = ui.finMonth.split('-').map(Number);
+    const mFrom = ui.finMonth + '-01', mTo = ymd(new Date(yy, mm, 0));
+    const pend = fixedDue(mFrom, mTo, false);
+    const mon = parseYmd(mFrom).toLocaleDateString('de-DE', { month: 'long' });
+    const sumP = pend.reduce((x, i) => x + i.amount, 0);
+    const names = pend.slice(0, 4).map(i => i.fx.name).join(', ') + (pend.length > 4 ? ` und ${pend.length - 4} weitere` : '');
+    $('#fixPending').innerHTML = !data.fixed.some(inAccFx) ? '' : pend.length
+      ? `<button class="panel fix-pend" data-act="goto-fix-month"><span class="t"><b>Noch anstehende Fixkosten im ${esc(mon)}</b><span class="c">${pend.length} ${pend.length === 1 ? 'Posten' : 'Posten'}: ${esc(names)}</span>
+           ${mFrom.slice(0, 7) === todayStr().slice(0, 7) ? `<span class="c">Saldo nach Abzug: ${eur.format(s.bal - sumP)}</span>` : ''}</span><span class="amt out">−${eur.format(sumP)}</span></button>`
+      : `<div class="panel fix-pend done"><span class="t"><b>Alle Fixkosten im ${esc(mon)} sind gebucht</b></span></div>`;
+  }
   $('#listCount').textContent = entries.length ? `(${entries.length})` : '';
   $('#ffInfo').textContent = ffActive() ? `${entries.length} ${entries.length === 1 ? 'Buchung' : 'Buchungen'} gefunden` : '';
   $('#finList').innerHTML = entries.length
     ? entries.slice(0, LIMIT).map(f => {
         const fxName = f.fixedId ? (data.fixed.find(x => x.id === f.fixedId) || {}).name : '';
-        const sub = [f.cat || 'Ohne Kategorie', fxName ? 'Fixkosten: ' + fxName : '', ui.finAccount === 'all' && multi ? accName(f.accountId) : ''].filter(Boolean).join(', ');
+        const sub = [f.cat || 'Ohne Kategorie', fxName ? 'Fixkosten: ' + fxName : '', ui.finAccount === 'all' && multi ? accName(f.accountId) : '',
+                     meta.showIban && f.cpIban ? 'IBAN ' + fmtIban(f.cpIban) : ''].filter(Boolean).join(', ');
         return `<button class="fin-row${f.cat === TRANSFER ? ' transfer' : ''}" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', withYear ? { day: '2-digit', month: '2-digit', year: '2-digit' } : { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}<span class="c">${esc(sub)}</span></span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`;
       }).join('') + (entries.length > LIMIT ? `<p class="muted">Die ersten ${LIMIT} von ${entries.length} Buchungen. Grenze den Filter weiter ein, um alle zu sehen.</p>` : '')
     : ffActive() ? '<p class="empty">Keine Buchungen passen zum Filter.</p>'
@@ -1879,7 +1912,8 @@ function editFin(id) {
                 options: [{ value: '', label: 'Keine Fixkosten' }, ...[...data.fixed].sort((x, y) => x.name.localeCompare(y.name, 'de'))
                   .map(x => ({ value: x.id, label: `${x.name} (${RHYTHM[x.interval]}${fixedActive(x) ? '' : ', beendet'})` })),
                   { value: '__new', label: 'Neue Fixkosten aus dieser Buchung …' }] },
-              { name: 'note', label: 'Verwendungszweck / Notiz', type: 'textarea', value: f.note });
+              { name: 'note', label: 'Verwendungszweck / Notiz', type: 'textarea', value: f.note },
+              { name: 'cpIban', label: f.type === 'einnahme' ? 'IBAN Auftraggeber' : 'IBAN Empfänger', value: f.cpIban ? fmtIban(f.cpIban) : '' });
   openDialog({
     title: 'Buchung bearbeiten',
     fields,
@@ -1887,7 +1921,7 @@ function editFin(id) {
       const amount = parseAmount(v.amount);
       if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben, zum Beispiel 12,50.'); return false; }
       const oldCat = f.cat || '';
-      Object.assign(f, { type: v.type, date: v.date, desc: v.desc.trim(), cat: (v.cat || '').trim(), amount, note: (v.note || '').trim() });
+      Object.assign(f, { type: v.type, date: v.date, desc: v.desc.trim(), cat: (v.cat || '').trim(), amount, note: (v.note || '').trim(), cpIban: normIban(v.cpIban) });
       if (v.acc) f.accountId = v.acc;
       if (f.cat !== oldCat) { f.catManual = true; delete f.transferWith; }
       addCategory(f.cat);
@@ -1922,6 +1956,7 @@ function editFixed(id) {
   if (multi) fields.push({ name: 'acc', label: 'Konto', type: 'select', value: fx ? fx.accountId : (ui.finAccount !== 'all' ? ui.finAccount : data.accounts[0].id), options: data.accounts.map(a => ({ value: a.id, label: a.name })), half: true });
   fields.push({ name: 'cat', label: 'Kategorie', value: fx ? fx.cat : '', list: 'catList', half: multi },
     { name: 'match', label: 'Erkennen an', value: fx ? fx.match : '', hint: 'Text im Empfänger oder Verwendungszweck, z. B. der Name des Vertragspartners. Passende Buchungen werden automatisch zugeordnet.' },
+    { name: 'iban', label: 'Empfänger-IBAN (optional)', value: fx && fx.iban ? fmtIban(fx.iban) : '', hint: 'Nur nötig, wenn mehrere Fixkosten denselben Empfänger und Verwendungszweck haben. Dann werden Buchungen nur bei passender IBAN zugeordnet.' },
     { name: 'startDate', label: fx && fx.lastDate ? 'Beginnt am (optional)' : 'Erste Abbuchung', type: 'date', value: fx ? fx.startDate : '', half: true },
     { name: 'endDate', label: 'Endet am (optional)', type: 'date', value: fx ? fx.endDate : '', half: true });
   openDialog({
@@ -1933,11 +1968,22 @@ function editFixed(id) {
       if (!(fx && fx.lastDate) && !v.startDate) { toast('Bitte das Datum der ersten Abbuchung angeben, damit die Fälligkeiten berechnet werden können.'); return false; }
       if (v.startDate && v.endDate && v.endDate < v.startDate) { toast('Das Ende liegt vor dem Beginn.'); return false; }
       const rec = { name: v.name.trim(), amount, interval: +v.interval, accountId: v.acc || (fx ? fx.accountId : data.accounts[0].id),
-                    cat: (v.cat || '').trim(), match: (v.match || '').trim() || v.name.trim(), startDate: v.startDate || '', endDate: v.endDate || '' };
+                    cat: (v.cat || '').trim(), match: (v.match || '').trim() || v.name.trim(), iban: normIban(v.iban), startDate: v.startDate || '', endDate: v.endDate || '' };
       let target = fx;
       if (fx) Object.assign(fx, rec, { auto: false });
       else { target = { id: uid(), ...rec, lastDate: '', auto: false, created: new Date().toISOString() }; data.fixed.push(target); }
       addCategory(target.cat);
+      // Buchungen, die nach der Änderung (z. B. neue IBAN) nicht mehr passen, gehen an einen passenden anderen Posten oder werden frei
+      const moved = new Set();
+      data.finance.filter(f => f.fixedId === target.id && !fixedMatches(target, f)).forEach(f => {
+        delete f.fixedId; const other = bestFixed(f); if (other) { f.fixedId = other.id; moved.add(other); }
+      });
+      // Buchungen mit genau dieser IBAN, die bisher an einem Posten ohne IBAN hängen, wandern hierher
+      if (target.iban) data.finance.filter(f => f.fixedId && f.fixedId !== target.id && fixedMatches(target, f)).forEach(f => {
+        const cur = data.fixed.find(x => x.id === f.fixedId);
+        if (cur && !cur.iban) { f.fixedId = target.id; moved.add(cur); }
+      });
+      moved.forEach(refreshFixed);
       const free = data.finance.filter(f => !f.fixedId && fixedMatches(target, f));
       free.forEach(f => { f.fixedId = target.id; if (!f.catManual && target.cat && !f.cat) f.cat = target.cat; });
       const lastBefore = target.lastDate;
@@ -1948,7 +1994,7 @@ function editFixed(id) {
     },
     onDelete: fx ? () => {
       data.finance.forEach(f => { if (f.fixedId === fx.id) delete f.fixedId; });
-      if (fx.auto) data.settings.fixedIgnore.push(fx.accountId + '|' + partyKey(fx.match));
+      if (fx.auto) data.settings.fixedIgnore.push(fx.accountId + '|' + partyKey(fx.match) + (fx.iban ? '|' + fx.iban : ''));
       data.fixed = data.fixed.filter(x => x !== fx);
       commit();
     } : null
@@ -1975,11 +2021,13 @@ function reevaluate() {
   let nCat = 0;
   for (const f of data.finance) if (!f.cat && !f.catManual) { const c = guessCat(f.party, `${f.note || ''} ${f.desc || ''}`); if (c) { f.cat = c; nCat++; } }
   const nTrans = detectTransfers(data.finance);
+  const nSplit = splitByIban();
   const nAssign = assignFixed(data.finance.filter(f => !f.fixedId));
   const nFix = detectFixed();
   commit();
   const parts = [nCat ? `${nCat} Buchungen kategorisiert` : '', nTrans ? `${nTrans} Umbuchungen erkannt` : '',
-                 nAssign ? `${nAssign} Buchungen Fixkosten zugeordnet` : '', nFix ? `${nFix} neue Fixkosten erkannt` : ''].filter(Boolean);
+                 nAssign ? `${nAssign} Buchungen Fixkosten zugeordnet` : '', nFix ? `${nFix} neue Fixkosten erkannt` : '',
+                 nSplit ? `${nSplit} Fixkosten nach IBAN getrennt` : ''].filter(Boolean);
   toast(parts.length ? parts.join(', ') + '.' : 'Nichts Neues gefunden.');
 }
 function parseSigned(s) {
@@ -2103,15 +2151,18 @@ function fixedMatches(fx, f) {
   if (fx.endDate && f.date > fx.endDate) return false;
   if (fx.startDate && f.date < addDays(fx.startDate, -20)) return false;
   if (fx.accountId && f.accountId !== fx.accountId) return false;
+  if (fx.iban && normIban(f.cpIban) !== fx.iban) return false;
   const m = (fx.match || '').toLowerCase().trim();
   if (!m) return false;
   return fText(f).toLowerCase().includes(m) || partyKey(f.party) === partyKey(fx.match);
 }
+const fmtIban = v => normIban(v).replace(/(.{4})/g, '$1 ').trim();
+const bestFixed = f => { const c = data.fixed.filter(x => fixedMatches(x, f)); return c.find(x => x.iban) || c[0] || null; };
 function assignFixed(list) {
   let n = 0;
   for (const f of list) {
     if (f.fixedId) continue;
-    const fx = data.fixed.find(x => fixedMatches(x, f));
+    const fx = bestFixed(f);
     if (fx) { f.fixedId = fx.id; if (!f.catManual && fx.cat && !f.cat) f.cat = fx.cat; n++; }
   }
   data.fixed.forEach(refreshFixed);
@@ -2122,12 +2173,15 @@ function detectFixed() {
   const groups = {};
   for (const f of data.finance) {
     if (f.type !== 'ausgabe' || f.cat === TRANSFER || f.fixedId || !partyKey(f.party)) continue;
-    const k = f.accountId + '|' + partyKey(f.party);
+    const k = f.accountId + '|' + partyKey(f.party) + '|' + normIban(f.cpIban);
     (groups[k] = groups[k] || []).push(f);
   }
+  const perParty = {};
+  Object.keys(groups).forEach(k => { const pk = k.slice(0, k.lastIndexOf('|')); perParty[pk] = (perParty[pk] || 0) + 1; });
   let created = 0;
   for (const [k, list] of Object.entries(groups)) {
-    if (list.length < 2 || data.settings.fixedIgnore.includes(k)) continue;
+    const pk = k.slice(0, k.lastIndexOf('|')), iban = k.slice(k.lastIndexOf('|') + 1);
+    if (list.length < 2 || data.settings.fixedIgnore.includes(k) || data.settings.fixedIgnore.includes(pk)) continue;
     list.sort((a, b) => a.date.localeCompare(b.date));
     const gaps = list.slice(1).map((f, i) => dayDiff(list[i].date, f.date));
     const amts = list.map(f => f.amount);
@@ -2138,8 +2192,9 @@ function detectFixed() {
       if (ok < Math.ceil(gaps.length * 0.8)) continue;
       const last = list[list.length - 1];
       if (dayDiff(last.date, todayStr()) > hi * 1.6) break;               // seit Langem nicht mehr abgebucht
-      const fx = { id: uid(), name: last.party, amount: last.amount, interval: iv, accountId: last.accountId, cat: last.cat || '',
-                   match: last.party, startDate: '', endDate: '', lastDate: last.date, auto: true, created: new Date().toISOString() };
+      const twin = perParty[pk] > 1 && iban;               // gleicher Empfänger mit mehreren IBANs: IBAN zur Unterscheidung merken
+      const fx = { id: uid(), name: twin ? twinName(last.party, last.accountId) : last.party, amount: last.amount, interval: iv, accountId: last.accountId, cat: last.cat || '',
+                   match: last.party, iban: twin ? iban : '', startDate: '', endDate: '', lastDate: last.date, auto: true, created: new Date().toISOString() };
       data.fixed.push(fx);
       list.forEach(f => { f.fixedId = fx.id; });
       refreshFixed(fx);
@@ -2148,6 +2203,38 @@ function detectFixed() {
     }
   }
   return created;
+}
+/* Name für Posten mit gleichem Empfänger: durchnummeriert statt mit IBAN, umbenennen kannst du sie jederzeit */
+function twinName(base, acc) {
+  const taken = new Set(data.fixed.filter(x => x.accountId === acc).map(x => x.name));
+  let i = 1;
+  while (taken.has(`${base} (${i})`)) i++;
+  return `${base} (${i})`;
+}
+/* Ein Fixkostenposten, unter dem Abbuchungen an verschiedene IBANs im selben Zeitraum laufen, wird aufgeteilt */
+function splitByIban() {
+  let n = 0;
+  for (const fx of [...data.fixed]) {
+    if (fx.iban) continue;
+    const own = data.finance.filter(f => f.fixedId === fx.id);
+    const by = {};
+    own.forEach(f => { const ib = normIban(f.cpIban); if (ib) (by[ib] = by[ib] || []).push(f); });
+    const ibans = Object.keys(by);
+    if (ibans.length < 2) continue;
+    const months = ib => new Set(by[ib].map(f => f.date.slice(0, 7)));
+    const m0 = months(ibans[0]);
+    if (!ibans.slice(1).some(ib => [...months(ib)].some(m => m0.has(m)))) continue;   // nacheinander = nur Kontowechsel, nicht aufteilen
+    for (const ib of ibans) {
+      const nx = { ...fx, id: uid(), iban: ib, name: twinName(fx.name, fx.accountId), created: new Date().toISOString() };
+      data.fixed.push(nx);
+      by[ib].forEach(f => { f.fixedId = nx.id; });
+      refreshFixed(nx);
+      n++;
+    }
+    if (!data.finance.some(f => f.fixedId === fx.id)) data.fixed = data.fixed.filter(x => x !== fx);
+    else refreshFixed(fx);
+  }
+  return n;
 }
 /* Fälligkeiten eines Fixkostenpostens in einem Zeitraum */
 function occurrences(fx, from, to) {
@@ -2335,8 +2422,8 @@ function planImport(acc, out) {
   const existing = data.finance.filter(f => f.accountId === acc);
   const byKey = new Map();
   existing.forEach(f => { if (f.importKey && !byKey.has(f.importKey)) byKey.set(f.importKey, f); });
-  const used = new Set(), dup = new Set();
-  for (const t of out) { const f = byKey.get(t.key); if (f && !used.has(f)) { used.add(f); dup.add(t); } }
+  const used = new Set(), dup = new Set(), match = new Map();
+  for (const t of out) { const f = byKey.get(t.key); if (f && !used.has(f)) { used.add(f); dup.add(t); match.set(t, f); } }
   const similar = (f, t) => {
     const a = partyKey(f.party || f.desc), b = partyKey(t.party || t.purpose);
     return !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 6) === b.slice(0, 6));
@@ -2347,9 +2434,9 @@ function planImport(acc, out) {
     const cands = existing.filter(f => !used.has(f) && f.type === type && Math.abs(f.amount - amt) < 0.005 && Math.abs(dayDiff(f.date, t.date)) <= 3);
     const hit = cands.find(f => f.date === t.date && similar(f, t)) || cands.find(f => f.date === t.date && !f.importKey)
              || cands.find(f => f.date === t.date && f.importKey && !out.some(o => o.key === f.importKey)) || cands.find(f => similar(f, t));
-    if (hit) { used.add(hit); dup.add(t); }
+    if (hit) { used.add(hit); dup.add(t); match.set(t, hit); }
   }
-  return { dup, fresh: out.filter(t => !dup.has(t)) };
+  return { dup, match, fresh: out.filter(t => !dup.has(t)) };
 }
 const existingKeys = acc => new Set(data.finance.filter(f => f.accountId === acc && f.importKey).map(f => f.importKey));
 function openImport() {
@@ -2390,8 +2477,10 @@ function renderImport() {
         `<tr${dup.has(t) ? ' class="dup" title="Schon vorhanden"' : ''}><td>${esc(parseYmd(t.date).toLocaleDateString('de-DE'))}</td><td>${esc(t.party)}</td><td>${esc(t.purpose)}</td><td class="r amt ${t.amt < 0 ? 'out' : 'in'}">${eur.format(t.amt)}</td></tr>`).join('')}</tbody></table></div>${out.length > 10 ? `<p class="muted">Vorschau der ersten 10 von ${out.length} Umsätzen.</p>` : ''}`
     : '<p class="empty">Keine Umsätze erkannt. Prüfe oben, welche Spalten Datum und Betrag enthalten.</p>';
   $('#impInfo').textContent = out.length ? `${out.length} Umsätze erkannt, ${out.length - fresh.length} davon schon vorhanden${invalid ? `, ${invalid} Zeilen ohne Datum oder Betrag übersprungen` : ''}.` : '';
-  $('#impGo').disabled = !fresh.length;
-  $('#impGo').textContent = fresh.length ? `${fresh.length} ${fresh.length === 1 ? 'Umsatz' : 'Umsätze'} importieren` : 'Nichts Neues zu importieren';
+  const { match: mt } = planImport(acc, out);
+  const canEnrich = [...mt].some(([t, f]) => !f.cpIban && t.iban);
+  $('#impGo').disabled = !fresh.length && !canEnrich;
+  $('#impGo').textContent = fresh.length ? `${fresh.length} ${fresh.length === 1 ? 'Umsatz' : 'Umsätze'} importieren` : canEnrich ? 'Vorhandene Buchungen ergänzen' : 'Nichts Neues zu importieren';
 }
 $('#impFile').addEventListener('change', async e => {
   const file = e.target.files && e.target.files[0];
@@ -2410,7 +2499,9 @@ $('#impCancel').addEventListener('click', () => $('#impDlg').close());
 $('#impGo').addEventListener('click', () => {
   const acc = $('#impAcc').value;
   const { out } = impTransactions();
-  const { fresh } = planImport(acc, out);
+  const { fresh, match } = planImport(acc, out);
+  let enriched = 0;
+  match.forEach((f, t) => { if (!f.cpIban && t.iban) { f.cpIban = t.iban; enriched++; } });   // nur ergänzen, nichts überschreiben
   let n = 0, latest = '';
   const added = [];
   const a = data.accounts.find(x => x.id === acc);
@@ -2424,6 +2515,7 @@ $('#impGo').addEventListener('click', () => {
     if (t.date > latest) latest = t.date;
   }
   const nTrans = detectTransfers(added);
+  const nSplit = splitByIban();
   assignFixed(added);
   const nFix = detectFixed();
   let balMsg = '';
@@ -2435,8 +2527,9 @@ $('#impGo').addEventListener('click', () => {
   ui.finAccount = data.accounts.length > 1 ? acc : ui.finAccount;
   if (latest) ui.finMonth = latest.slice(0, 7);
   commit();
-  toast([`${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} importiert`, nTrans ? `${nTrans} ${nTrans === 1 ? 'Umbuchung' : 'Umbuchungen'} erkannt` : '',
-         nFix ? `${nFix} neue Fixkosten erkannt` : '', balMsg].filter(Boolean).join(', ') + '.');
+  toast([n ? `${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} importiert` : 'Keine neuen Umsätze', nTrans ? `${nTrans} ${nTrans === 1 ? 'Umbuchung' : 'Umbuchungen'} erkannt` : '',
+         nFix ? `${nFix} neue Fixkosten erkannt` : '', nSplit ? `${nSplit} Fixkosten nach IBAN getrennt` : '',
+         enriched ? `bei ${enriched} vorhandenen Buchungen IBAN ergänzt` : '', balMsg].filter(Boolean).join(', ') + '.');
 });
 
 /* ---------- Bedienung ---------- */
@@ -2487,7 +2580,7 @@ document.addEventListener('click', async e => {
     case 'fin-tab': ui.finTab = d.tab; renderFin(); break;
     case 'ff-toggle': ui.ffOpen = !ui.ffOpen; if (ui.ffOpen) { meta.fold = meta.fold || {}; meta.fold.list = true; saveMeta(); renderFolds(); } renderFilter(); if (ui.ffOpen) $('#ffCat').focus(); break;
     case 'fb-toggle': ui.fbOpen = !ui.fbOpen; if (ui.fbOpen) { meta.fold = meta.fold || {}; meta.fold.list = true; saveMeta(); } renderFin(); if (ui.fbOpen) $('#finForm [name=desc]').focus(); break;
-    case 'fold': meta.fold = meta.fold || {}; meta.fold[d.k] = meta.fold[d.k] === false; saveMeta(); renderFolds(); break;
+    case 'fold': { const open = foldOpen(d.k); meta.fold[d.k] = !open; saveMeta(); renderFolds(); break; }
     case 'h10-tab': ui.h10Tab = d.tab; meta.h10Tab = d.tab; saveMeta(); renderH10(); break;
     case 'h10-inv': ui.h10Inv = d.f; renderH10(); break;
     case 'loan-new': editLoan(null); break;
@@ -2499,10 +2592,12 @@ document.addEventListener('click', async e => {
     case 'open-url': if (d.url) window.open(d.url, '_blank', 'noopener'); break;
     case 'ff-reset': ui.ff = { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }; renderFin(); break;
     case 'goto-fix': ui.finTab = 'fix'; ui.fixRange = '14'; goto('fin'); renderFin(); break;
+    case 'iban-toggle': meta.showIban = !meta.showIban; saveMeta(); renderFin(); break;
+    case 'goto-fix-month': ui.finTab = 'fix'; ui.fixRange = 'month'; renderFin(); window.scrollTo(0, 0); break;
     case 'fix-range': ui.fixRange = d.r; renderFix(); break;
     case 'fix-new': editFixed(null); break;
     case 'fix-edit': editFixed(d.id); break;
-    case 'fix-detect': { const before = data.fixed.length; assignFixed(data.finance.filter(f => !f.fixedId)); const n = detectFixed(); commit();
+    case 'fix-detect': { const before = data.fixed.length; const sp = splitByIban(); assignFixed(data.finance.filter(f => !f.fixedId)); const n = detectFixed() + sp; commit();
       toast(n ? `${n} neue Fixkosten erkannt` : (data.fixed.length === before ? 'Keine weiteren regelmäßigen Abbuchungen gefunden.' : 'Fixkosten aktualisiert')); break; }
     case 'kat-apply': reevaluate(); break;
     case 'kat-del': {
