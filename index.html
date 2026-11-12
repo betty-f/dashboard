@@ -325,6 +325,15 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
   .acc-tools{padding:2px 12px 8px}
 }
 
+/* Buchungsfilter */
+.ff-panel{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.ff-panel .field{margin:0}
+.ff-actions{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px}
+#ffBtn.on{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+.monthbar.dim{opacity:.45}
+@media (max-width:900px){.ff-panel{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.fin-row .d{white-space:nowrap;width:62px}
+
 </style>
 </head>
 <body>
@@ -417,13 +426,24 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
             <div class="row" style="margin:0">
               <button class="btn small primary" data-act="imp-open">Umsätze aus CSV importieren</button>
               <button class="btn small" data-act="acc-new">Konto hinzufügen</button>
+              <button class="btn small" id="ffBtn" data-act="ff-toggle" aria-expanded="false" aria-controls="ffPanel">Filter</button>
             </div>
-            <div class="monthbar" style="margin:0">
+            <div class="monthbar" id="finMonthbar" style="margin:0">
               <button class="btn icon" data-act="fin-prev" aria-label="Voriger Monat">‹</button>
               <h2 id="finTitle"></h2>
               <button class="btn icon" data-act="fin-next" aria-label="Nächster Monat">›</button>
             </div>
           </div>
+          <form id="ffPanel" class="panel ff-panel" autocomplete="off" hidden>
+            <div class="field"><label for="ffCat">Kategorie</label><select id="ffCat" name="cat"></select></div>
+            <div class="field"><label for="ffWho">An / von</label><input id="ffWho" name="who" placeholder="Name oder Text" list="ffWhoList"></div>
+            <div class="field"><label for="ffMin">Betrag ab €</label><input id="ffMin" name="min" inputmode="decimal" placeholder="z. B. 1000"></div>
+            <div class="field"><label for="ffMax">Betrag bis €</label><input id="ffMax" name="max" inputmode="decimal" placeholder="beliebig"></div>
+            <div class="field"><label for="ffFrom">Datum von</label><input id="ffFrom" name="from" type="date"></div>
+            <div class="field"><label for="ffTo">Datum bis</label><input id="ffTo" name="to" type="date"></div>
+            <div class="ff-actions"><span id="ffInfo" class="muted"></span><button type="button" class="btn small" data-act="ff-reset">Filter zurücksetzen</button></div>
+            <datalist id="ffWhoList"></datalist>
+          </form>
           <div class="fin-sum" id="finSum"></div>
           <form id="finForm" class="panel fin-form" autocomplete="off">
             <div class="seg" id="finType">
@@ -657,7 +677,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { ff: { cat: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -1256,6 +1276,40 @@ function renderKat(force) {
       <span class="kat-n">${counts[c] || 0}<span class="m"> ${(counts[c] || 0) === 1 ? 'Buchung' : 'Buchungen'}</span></span>${fixed ? '<span></span>' : `<button class="btn small danger" data-act="kat-del" data-i="${i}" aria-label="${esc(c)} löschen">Löschen</button>`}</div>`;
   }).join('');
 }
+const ffActive = () => Object.values(ui.ff).some(v => v !== '');
+const ffRange = () => ui.ff.from || ui.ff.to;
+function ffMatch(f) {
+  const F = ui.ff;
+  if (F.cat === '__none' ? !!f.cat : F.cat && f.cat !== F.cat) return false;
+  if (F.who && !`${f.party || ''} ${f.desc || ''} ${f.note || ''}`.toLowerCase().includes(F.who.toLowerCase().trim())) return false;
+  const mn = parseAmount(F.min), mx = parseAmount(F.max);
+  if (isFinite(mn) && f.amount < mn) return false;
+  if (isFinite(mx) && f.amount > mx) return false;
+  return true;
+}
+function inPeriod(f) {
+  if (!f.date) return false;
+  if (!ffRange()) return f.date.slice(0, 7) === ui.finMonth;
+  return (!ui.ff.from || f.date >= ui.ff.from) && (!ui.ff.to || f.date <= ui.ff.to);
+}
+function renderFilter() {
+  const F = ui.ff, n = Object.values(F).filter(v => v !== '').length;
+  $('#ffPanel').hidden = !ui.ffOpen;
+  $('#ffBtn').setAttribute('aria-expanded', ui.ffOpen);
+  $('#ffBtn').classList.toggle('on', n > 0);
+  $('#ffBtn').textContent = n ? `Filter (${n})` : 'Filter';
+  const sel = $('#ffCat');
+  if (document.activeElement !== sel) {
+    const cats = [...new Set([...data.settings.categories, ...data.finance.map(f => f.cat).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'de'));
+    sel.innerHTML = `<option value="">Alle Kategorien</option><option value="__none">Ohne Kategorie</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    sel.value = F.cat;
+  }
+  const parties = [...new Set(data.finance.filter(inAcc).map(f => f.party || f.desc).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  $('#ffWhoList').innerHTML = parties.slice(0, 300).map(x => `<option value="${esc(x)}"></option>`).join('');
+  for (const [id, k] of [['ffWho', 'who'], ['ffMin', 'min'], ['ffMax', 'max'], ['ffFrom', 'from'], ['ffTo', 'to']])
+    if (document.activeElement !== $('#' + id)) $('#' + id).value = F[k];
+  $('#finMonthbar').classList.toggle('dim', !!ffRange());
+}
 function renderFin() {
   $$('#finTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === ui.finTab));
   $('#finTabBuchungen').hidden = ui.finTab !== 'buchungen';
@@ -1264,7 +1318,9 @@ function renderFin() {
   renderAccounts();
   renderFix(); renderKat();
   const ym = ui.finMonth, multi = data.accounts.length > 1;
-  $('#finTitle').textContent = monthName(ym);
+  renderFilter();
+  const dt = x => parseYmd(x).toLocaleDateString('de-DE');
+  $('#finTitle').textContent = !ffRange() ? monthName(ym) : ui.ff.from && ui.ff.to ? `${dt(ui.ff.from)} – ${dt(ui.ff.to)}` : ui.ff.from ? 'ab ' + dt(ui.ff.from) : 'bis ' + dt(ui.ff.to);
   $$('#finType button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === ui.finType));
   const sel = $('#finForm').elements.namedItem('acc');
   sel.hidden = !multi;
@@ -1273,27 +1329,32 @@ function renderFin() {
     sel.innerHTML = data.accounts.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
     sel.value = ui.finAccount !== 'all' ? ui.finAccount : (meta.lastAccount && data.accounts.some(a => a.id === meta.lastAccount) ? meta.lastAccount : data.accounts[0].id);
   }
-  const s = finSums(ym);
+  const entries = data.finance.filter(f => inAcc(f) && inPeriod(f) && ffMatch(f))
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.created || '').localeCompare(a.created || ''));
+  const s = { inc: 0, exp: 0 };
+  for (const f of entries) if (f.cat !== TRANSFER) { if (f.type === 'einnahme') s.inc += f.amount; else s.exp += f.amount; }
+  s.bal = s.inc - s.exp;
   $('#finSum').innerHTML = `
     <div class="stat in"><span>Einnahmen</span><b>${eur.format(s.inc)}</b></div>
     <div class="stat out"><span>Ausgaben</span><b>${eur.format(s.exp)}</b></div>
     <div class="stat ${s.bal < 0 ? 'out' : 'in'}"><span>Saldo</span><b>${eur.format(s.bal)}</b></div>`;
   const cats = new Set([...data.settings.categories, ...data.finance.map(f => f.cat).filter(Boolean)]);
   $('#catList').innerHTML = [...cats].sort((a, b) => a.localeCompare(b, 'de')).map(c => `<option value="${esc(c)}"></option>`).join('');
-  const entries = data.finance.filter(f => f.date && f.date.slice(0, 7) === ym && inAcc(f))
-    .sort((a, b) => b.date.localeCompare(a.date) || (b.created || '').localeCompare(a.created || ''));
   const byCat = {};
   for (const f of entries) if (f.type !== 'einnahme' && f.cat !== TRANSFER) byCat[f.cat || 'Ohne Kategorie'] = (byCat[f.cat || 'Ohne Kategorie'] || 0) + f.amount;
   const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const max = catRows.length ? catRows[0][1] : 0;
   $('#finCats').innerHTML = catRows.length
     ? catRows.map(([c, v]) => `<div class="bar-row"><span>${esc(c)}</span><span class="amt">${eur.format(v)}</span><span class="bar"><i style="width:${max ? (v / max * 100).toFixed(1) : 0}%"></i></span></div>`).join('')
-    : '<p class="empty">Keine Ausgaben in diesem Monat.</p>';
+    : `<p class="empty">${ffActive() ? 'Keine passenden Ausgaben.' : 'Keine Ausgaben in diesem Monat.'}</p>`;
+  const LIMIT = 300, withYear = !!ffRange();
+  $('#ffInfo').textContent = ffActive() ? `${entries.length} ${entries.length === 1 ? 'Buchung' : 'Buchungen'} gefunden` : '';
   $('#finList').innerHTML = entries.length
-    ? entries.map(f => {
+    ? entries.slice(0, LIMIT).map(f => {
         const sub = [f.cat || 'Ohne Kategorie', f.fixedId ? 'Fixkosten' : '', ui.finAccount === 'all' && multi ? accName(f.accountId) : ''].filter(Boolean).join(', ');
-        return `<button class="fin-row${f.cat === TRANSFER ? ' transfer' : ''}" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}<span class="c">${esc(sub)}</span></span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`;
-      }).join('')
+        return `<button class="fin-row${f.cat === TRANSFER ? ' transfer' : ''}" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', withYear ? { day: '2-digit', month: '2-digit', year: '2-digit' } : { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}<span class="c">${esc(sub)}</span></span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`;
+      }).join('') + (entries.length > LIMIT ? `<p class="muted">Die ersten ${LIMIT} von ${entries.length} Buchungen. Grenze den Filter weiter ein, um alle zu sehen.</p>` : '')
+    : ffActive() ? '<p class="empty">Keine Buchungen passen zum Filter.</p>'
     : '<p class="empty">Noch keine Buchungen in diesem Monat. Erfasse oben eine oder importiere die Umsätze deines Kontos.</p>';
 }
 
@@ -2063,6 +2124,8 @@ document.addEventListener('click', async e => {
     case 'fin-next': ui.finMonth = addMonths(ui.finMonth, 1); renderFin(); break;
     case 'fin-type': ui.finType = d.t; renderFin(); break;
     case 'fin-tab': ui.finTab = d.tab; renderFin(); break;
+    case 'ff-toggle': ui.ffOpen = !ui.ffOpen; renderFilter(); if (ui.ffOpen) $('#ffCat').focus(); break;
+    case 'ff-reset': ui.ff = { cat: '', who: '', min: '', max: '', from: '', to: '' }; renderFin(); break;
     case 'goto-fix': ui.finTab = 'fix'; ui.fixRange = '14'; goto('fin'); renderFin(); break;
     case 'fix-range': ui.fixRange = d.r; renderFix(); break;
     case 'fix-new': editFixed(null); break;
@@ -2136,6 +2199,14 @@ $('#todoForm').addEventListener('submit', e => {
   text.focus();
 });
 
+['input', 'change'].forEach(ev => $('#ffPanel').addEventListener(ev, e => {
+  const k = e.target.name;
+  if (!(k in ui.ff)) return;
+  if (ev === 'input' && e.target.type === 'date') return;
+  ui.ff[k] = e.target.value.trim();
+  renderFin();
+}));
+$('#ffPanel').addEventListener('submit', e => e.preventDefault());
 $('#katForm').addEventListener('submit', e => {
   e.preventDefault();
   const inp = e.target.elements.namedItem('name'), name = inp.value.trim();
