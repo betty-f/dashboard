@@ -334,6 +334,51 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 @media (max-width:900px){.ff-panel{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .fin-row .d{white-space:nowrap;width:62px}
 
+/* Aufklappbare Bereiche */
+.fold{margin-bottom:16px}
+.fold-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.fold-btn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:4px 0;font:inherit;font-size:15px;font-weight:650;color:var(--ink);cursor:pointer}
+.fold-count{font-weight:400;color:var(--muted);font-size:13.5px}
+.chev{width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:0 3px 3px 2px;transition:transform .15s}
+.fold.closed .chev{transform:rotate(-45deg);margin-bottom:0}
+.fold-body{margin-top:10px}
+.fold.closed .fold-body{display:none}
+.sub-panel{padding:12px;margin:0 0 12px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--line)}
+#fbBtn.on{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+#finTabBuchungen > .fin-sum{margin-bottom:16px}
+#finMonthbar[hidden]{display:none !important}
+@media (prefers-reduced-motion: reduce){.chev{transition:none}}
+
+/* Navigation: lange und kurze Beschriftung */
+.lbl-s{display:none}
+@media (max-width:800px){ .lbl-l{display:none} .lbl-s{display:inline} }
+
+/* Hausbau H10 */
+.h10-sum{grid-template-columns:repeat(4,minmax(0,1fr))}
+.stat small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.loan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-bottom:12px}
+.loan{display:flex;flex-direction:column;justify-content:flex-start;text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
+.loan:hover{border-color:var(--accent)}
+.loan-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}
+.loan-head b{font-size:16px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:14px}
+.kv > span:nth-child(odd){color:var(--muted)}
+.kv > span:nth-child(even){font-variant-numeric:tabular-nums}
+.loan-note{display:block;margin-top:10px}
+.state{font-size:12px;font-weight:600;padding:2px 8px;border-radius:12px;background:var(--surface-2);color:var(--muted);white-space:nowrap;flex:none}
+.st-bezahlt,.st-angenommen{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.st-late{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger)}
+.st-abgelehnt{text-decoration:line-through}
+.offer-group{margin-bottom:16px}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.tbl .r{text-align:right;white-space:nowrap}
+.tbl .neg{color:var(--danger);font-weight:600}
+@media (max-width:900px){ .h10-sum{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:640px){ .loan-grid{grid-template-columns:1fr} .nav button{font-size:10px} }
+
 </style>
 </head>
 <body>
@@ -344,7 +389,8 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
     <button data-act="goto" data-view="todos"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10M3.5 6l1.5 1.5L8 4.5M3.5 12l1.5 1.5L8 10.5M3.5 18l1.5 1.5L8 16.5"/></svg>Aufgaben</button>
     <button data-act="goto" data-view="cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Kalender</button>
     <button data-act="goto" data-view="fin"><svg viewBox="0 0 24 24"><path d="M18 6.5A7 7 0 1 0 18 17.5M4 10h10M4 14h10"/></svg>Finanzen</button>
-    <button data-act="goto" data-view="set"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Einstellungen</button>
+    <button data-act="goto" data-view="h10"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V10l7-5 7 5v11"/><path d="M10 21v-5h4v5"/><path d="M9 11h2M13 11h2"/></svg><span class="lbl-l">Hausbau H10</span><span class="lbl-s">H10</span></button>
+    <button data-act="goto" data-view="set"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg><span class="lbl-l">Einstellungen</span><span class="lbl-s">Mehr</span></button>
   </nav>
 
   <div class="main-wrap">
@@ -413,27 +459,33 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
       <section id="v-fin" class="view" hidden>
         <div class="view-head">
           <h1 class="view-title">Finanzen</h1>
+          <div class="row" style="margin:0">
+            <button class="btn small primary" data-act="imp-open">Umsätze aus CSV importieren</button>
+            <button class="btn small" data-act="acc-new">Konto hinzufügen</button>
+          </div>
+        </div>
+        <div class="acc-bar" id="accBar"></div>
+        <div class="fin-toolbar">
           <div class="seg" id="finTabs">
             <button type="button" data-act="fin-tab" data-tab="buchungen">Buchungen</button>
             <button type="button" data-act="fin-tab" data-tab="fix">Fixkosten</button>
             <button type="button" data-act="fin-tab" data-tab="kat">Kategorien</button>
           </div>
+          <div class="monthbar" id="finMonthbar" style="margin:0">
+            <button class="btn icon" data-act="fin-prev" aria-label="Voriger Monat">‹</button>
+            <h2 id="finTitle"></h2>
+            <button class="btn icon" data-act="fin-next" aria-label="Nächster Monat">›</button>
+          </div>
         </div>
-        <div class="acc-bar" id="accBar"></div>
 
         <div id="finTabBuchungen">
-          <div class="fin-toolbar">
-            <div class="row" style="margin:0">
-              <button class="btn small primary" data-act="imp-open">Umsätze aus CSV importieren</button>
-              <button class="btn small" data-act="acc-new">Konto hinzufügen</button>
-              <button class="btn small" id="ffBtn" data-act="ff-toggle" aria-expanded="false" aria-controls="ffPanel">Filter</button>
+          <div class="fin-sum" id="finSum"></div>
+          <section class="panel fold" data-fold="cats">
+            <div class="fold-head">
+              <button type="button" class="fold-btn" data-act="fold" data-k="cats" aria-expanded="true"><span class="chev" aria-hidden="true"></span>Ausgaben nach Kategorie</button>
             </div>
-            <div class="monthbar" id="finMonthbar" style="margin:0">
-              <button class="btn icon" data-act="fin-prev" aria-label="Voriger Monat">‹</button>
-              <h2 id="finTitle"></h2>
-              <button class="btn icon" data-act="fin-next" aria-label="Nächster Monat">›</button>
-            </div>
-          </div>
+            <div class="fold-body"><div id="finCats"></div></div>
+          </section>
           <form id="ffPanel" class="panel ff-panel" autocomplete="off" hidden>
             <div class="field"><label for="ffCat">Kategorie</label><select id="ffCat" name="cat"></select></div>
             <div class="field"><label for="ffFixed">Fixkosten</label><select id="ffFixed" name="fixed"></select></div>
@@ -445,23 +497,30 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
             <div class="ff-actions"><span id="ffInfo" class="muted"></span><button type="button" class="btn small" data-act="ff-reset">Filter zurücksetzen</button></div>
             <datalist id="ffWhoList"></datalist>
           </form>
-          <div class="fin-sum" id="finSum"></div>
-          <form id="finForm" class="panel fin-form" autocomplete="off">
-            <div class="seg" id="finType">
-              <button type="button" data-act="fin-type" data-t="ausgabe">Ausgabe</button>
-              <button type="button" data-act="fin-type" data-t="einnahme">Einnahme</button>
+          <section class="panel fold" data-fold="list">
+            <div class="fold-head">
+              <button type="button" class="fold-btn" data-act="fold" data-k="list" aria-expanded="true"><span class="chev" aria-hidden="true"></span>Buchungen <span class="fold-count" id="listCount"></span></button>
+              <div class="row" style="margin:0">
+                <button type="button" class="btn small" id="ffBtn" data-act="ff-toggle" aria-expanded="false" aria-controls="ffPanel">Filter</button>
+                <button type="button" class="btn small" id="fbBtn" data-act="fb-toggle" aria-expanded="false" aria-controls="finForm">Buchung hinzufügen</button>
+              </div>
             </div>
-            <input name="date" type="date" required aria-label="Datum">
-            <input name="desc" required placeholder="Beschreibung" aria-label="Beschreibung">
-            <input name="cat" list="catList" placeholder="Kategorie" aria-label="Kategorie">
-            <input name="amount" required inputmode="decimal" placeholder="Betrag in €" aria-label="Betrag in Euro">
-            <select name="acc" aria-label="Konto"></select>
-            <button class="btn primary">Buchen</button>
-          </form>
-          <div class="fin-cols">
-            <section class="panel"><h2>Ausgaben nach Kategorie</h2><div id="finCats"></div></section>
-            <section class="panel"><h2>Buchungen</h2><div id="finList" class="fin-list"></div></section>
-          </div>
+            <div class="fold-body">
+              <form id="finForm" class="fin-form with-acc sub-panel" autocomplete="off" hidden>
+                <div class="seg" id="finType">
+                  <button type="button" data-act="fin-type" data-t="ausgabe">Ausgabe</button>
+                  <button type="button" data-act="fin-type" data-t="einnahme">Einnahme</button>
+                </div>
+                <input name="date" type="date" required aria-label="Datum">
+                <input name="desc" required placeholder="Beschreibung" aria-label="Beschreibung">
+                <input name="cat" list="catList" placeholder="Kategorie" aria-label="Kategorie">
+                <input name="amount" required inputmode="decimal" placeholder="Betrag in €" aria-label="Betrag in Euro">
+                <select name="acc" aria-label="Konto"></select>
+                <button class="btn primary">Buchen</button>
+              </form>
+              <div id="finList" class="fin-list"></div>
+            </div>
+          </section>
         </div>
 
         <div id="finTabFix" hidden>
@@ -500,6 +559,21 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
           </section>
         </div>
         <datalist id="catList"></datalist>
+      </section>
+
+      <section id="v-h10" class="view" hidden>
+        <div class="view-head">
+          <h1 class="view-title">Hausbau H10</h1>
+          <div class="seg" id="h10Tabs">
+            <button type="button" data-act="h10-tab" data-tab="kredite">Kredite</button>
+            <button type="button" data-act="h10-tab" data-tab="rechnungen">Rechnungen</button>
+            <button type="button" data-act="h10-tab" data-tab="angebote">Angebote</button>
+          </div>
+        </div>
+        <div class="fin-sum h10-sum" id="h10Sum"></div>
+        <div id="h10Body"></div>
+        <datalist id="tradeList"></datalist>
+        <datalist id="firmList"></datalist>
       </section>
 
       <section id="v-set" class="view" hidden>
@@ -633,7 +707,7 @@ function parseAmount(s) {
 /* ---------- Daten ---------- */
 function emptyData() {
   return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
-           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [],
+           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [], h10: { loans: [], invoices: [], offers: [] },
            settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS],
                        catRules: { ...DEFAULT_RULES }, fixedIgnore: [] } };
 }
@@ -661,10 +735,20 @@ function normalize(d) {
     id: x.id, name: x.name || 'Fixkosten', amount: Number(x.amount) || 0, interval: [1, 3, 6, 12, 24].includes(+x.interval) ? +x.interval : 1,
     accountId: accounts.some(a => a.id === x.accountId) ? x.accountId : accounts[0].id, cat: x.cat || '', match: x.match || '',
     startDate: x.startDate || '', endDate: x.endDate || '', lastDate: x.lastDate || '', auto: !!x.auto, created: x.created || '' }));
+  const h = d.h10 && typeof d.h10 === 'object' ? d.h10 : {};
+  const arr = v => Array.isArray(v) ? v.filter(x => x && x.id) : [];
+  const h10 = {
+    loans: arr(h.loans).map(x => ({ id: x.id, bank: x.bank || '', name: x.name || '', amount: Number(x.amount) || 0, drawn: x.drawn === '' || x.drawn == null ? '' : Number(x.drawn) || 0,
+      rate: Number(x.rate) || 0, payment: Number(x.payment) || 0, firstPay: x.firstPay || '', fixedUntil: x.fixedUntil || '', extra: Number(x.extra) || 0, note: x.note || '', url: x.url || '' })),
+    invoices: arr(h.invoices).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', number: x.number || '', date: x.date || '',
+      amount: Number(x.amount) || 0, due: x.due || '', paid: !!x.paid, paidDate: x.paidDate || '', offerId: x.offerId || '', url: x.url || '', note: x.note || '' })),
+    offers: arr(h.offers).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', date: x.date || '', amount: Number(x.amount) || 0,
+      validUntil: x.validUntil || '', status: ['offen', 'angenommen', 'abgelehnt'].includes(x.status) ? x.status : 'offen', url: x.url || '', note: x.note || '' }))
+  };
   return { app: 'dashboard', version: 2, updatedAt: d.updatedAt || null,
            todos: Array.isArray(d.todos) ? d.todos : [],
            events: Array.isArray(d.events) ? d.events : [],
-           finance, accounts, fixed, settings: s };
+           finance, accounts, fixed, h10, settings: s };
 }
 function lsGet(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fallback; } catch { return fallback; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn(e); } }
@@ -678,7 +762,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { fbOpen: false, h10Tab: meta.h10Tab || 'kredite', h10Inv: 'alle', ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -1017,7 +1101,7 @@ async function importFile(file) {
 }
 
 /* ---------- Anzeige ---------- */
-function render() { renderNav(); renderStatus(); renderHome(); renderTodos(); renderCal(); renderFin(); renderSettings(); }
+function render() { renderNav(); renderStatus(); renderHome(); renderTodos(); renderCal(); renderFin(); renderH10(); renderSettings(); }
 
 function renderNav() {
   $$('.nav [data-view]').forEach(b => b.setAttribute('aria-current', b.dataset.view === ui.view ? 'page' : 'false'));
@@ -1320,7 +1404,20 @@ function renderFilter() {
     if (document.activeElement !== $('#' + id)) $('#' + id).value = F[k];
   $('#finMonthbar').classList.toggle('dim', !!ffRange());
 }
+function renderFolds() {
+  meta.fold = meta.fold || {};
+  $$('.fold').forEach(el => {
+    const open = meta.fold[el.dataset.fold] !== false;
+    el.classList.toggle('closed', !open);
+    $('.fold-btn', el).setAttribute('aria-expanded', open);
+  });
+}
 function renderFin() {
+  renderFolds();
+  $('#finMonthbar').hidden = ui.finTab !== 'buchungen';
+  $('#finForm').hidden = !ui.fbOpen;
+  $('#fbBtn').setAttribute('aria-expanded', ui.fbOpen);
+  $('#fbBtn').classList.toggle('on', ui.fbOpen);
   $$('#finTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === ui.finTab));
   $('#finTabBuchungen').hidden = ui.finTab !== 'buchungen';
   $('#finTabFix').hidden = ui.finTab !== 'fix';
@@ -1342,7 +1439,8 @@ function renderFin() {
   const entries = data.finance.filter(f => inAcc(f) && inPeriod(f) && ffMatch(f))
     .sort((a, b) => b.date.localeCompare(a.date) || (b.created || '').localeCompare(a.created || ''));
   const s = { inc: 0, exp: 0 };
-  for (const f of entries) if (f.cat !== TRANSFER) { if (f.type === 'einnahme') s.inc += f.amount; else s.exp += f.amount; }
+  const single = ui.finAccount !== 'all';      // im einzelnen Konto zählen Umbuchungen mit, in der Gesamtsicht nicht
+  for (const f of entries) if (single || f.cat !== TRANSFER) { if (f.type === 'einnahme') s.inc += f.amount; else s.exp += f.amount; }
   s.bal = s.inc - s.exp;
   $('#finSum').innerHTML = `
     <div class="stat in"><span>Einnahmen</span><b>${eur.format(s.inc)}</b></div>
@@ -1351,13 +1449,14 @@ function renderFin() {
   const cats = new Set([...data.settings.categories, ...data.finance.map(f => f.cat).filter(Boolean)]);
   $('#catList').innerHTML = [...cats].sort((a, b) => a.localeCompare(b, 'de')).map(c => `<option value="${esc(c)}"></option>`).join('');
   const byCat = {};
-  for (const f of entries) if (f.type !== 'einnahme' && f.cat !== TRANSFER) byCat[f.cat || 'Ohne Kategorie'] = (byCat[f.cat || 'Ohne Kategorie'] || 0) + f.amount;
+  for (const f of entries) if (f.type !== 'einnahme' && (single || f.cat !== TRANSFER)) byCat[f.cat || 'Ohne Kategorie'] = (byCat[f.cat || 'Ohne Kategorie'] || 0) + f.amount;
   const catRows = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const max = catRows.length ? catRows[0][1] : 0;
   $('#finCats').innerHTML = catRows.length
     ? catRows.map(([c, v]) => `<div class="bar-row"><span>${esc(c)}</span><span class="amt">${eur.format(v)}</span><span class="bar"><i style="width:${max ? (v / max * 100).toFixed(1) : 0}%"></i></span></div>`).join('')
     : `<p class="empty">${ffActive() ? 'Keine passenden Ausgaben.' : 'Keine Ausgaben in diesem Monat.'}</p>`;
   const LIMIT = 300, withYear = !!ffRange();
+  $('#listCount').textContent = entries.length ? `(${entries.length})` : '';
   $('#ffInfo').textContent = ffActive() ? `${entries.length} ${entries.length === 1 ? 'Buchung' : 'Buchungen'} gefunden` : '';
   $('#finList').innerHTML = entries.length
     ? entries.slice(0, LIMIT).map(f => {
@@ -1389,6 +1488,235 @@ function renderSettings() {
     ? g.map((c, i) => `<div class="set-row${c.listed ? '' : ' off'}">${colorIn(`data-gcal-color="${i}"`, colorOf(c), c.name)}<span class="name">${esc(c.name)}${c.userColor ? ` <button class="link" data-act="gcal-color-reset" data-i="${i}">Google-Farbe</button>` : ''}${cal.errors[c.id] ? `<span class="sub">Fehler: ${esc(cal.errors[c.id])}</span>` : ''}</span><label><input type="checkbox" data-gcal-list="${i}"${c.listed ? ' checked' : ''}>Anzeigen</label></div>`).join('')
     : `<p class="empty">${signedIn() ? 'Noch keine Google-Kalender geladen.' : 'Nach der Anmeldung erscheinen hier deine Google-Kalender.'}</p>`;
   $('#gcalList').innerHTML = gl;
+}
+
+/* ---------- Hausbau H10 ---------- */
+const TRADES = ['Grundstück', 'Notar & Gebühren', 'Planung & Architekt', 'Statik', 'Erdarbeiten', 'Rohbau', 'Zimmerer', 'Dach', 'Fenster & Türen',
+  'Elektro', 'Sanitär', 'Heizung', 'Lüftung', 'Estrich', 'Putz', 'Trockenbau', 'Fliesen', 'Maler', 'Bodenbeläge', 'Schreiner', 'Treppe',
+  'Garage & Carport', 'Außenanlagen', 'Küche', 'Hausanschlüsse', 'Sonstiges'];
+const fmtD = x => x ? parseYmd(x).toLocaleDateString('de-DE') : '';
+/* Restschuld eines Annuitätendarlehens: Monat für Monat Zins und Tilgung bis zum Stichtag */
+function loanState(l, until) {
+  const principal = l.drawn === '' ? l.amount : l.drawn;
+  let bal = principal - (l.extra || 0), interest = 0, paid = 0, months = 0;
+  if (!l.firstPay || !l.payment || bal <= 0) return { bal: Math.max(bal, 0), interest, paid, months, payoff: '' };
+  const r = l.rate / 100 / 12;
+  let d = l.firstPay;
+  while (d <= until && bal > 0 && months < 1200) {
+    const z = bal * r, pay = Math.min(l.payment, bal + z);
+    interest += z; paid += pay; bal = bal + z - pay; months++;
+    d = addMonthsDate(l.firstPay, months);
+  }
+  return { bal: Math.max(bal, 0), interest, paid, months, next: d };
+}
+function loanPayoff(l) {
+  const principal = (l.drawn === '' ? l.amount : l.drawn) - (l.extra || 0);
+  const r = l.rate / 100 / 12;
+  if (!l.payment || !l.firstPay || principal <= 0) return null;
+  if (l.payment <= principal * r) return { never: true };
+  let bal = principal, m = 0, interest = 0;
+  while (bal > 0.005 && m < 1200) { const z = bal * r; interest += z; bal = bal + z - Math.min(l.payment, bal + z); m++; }
+  return { months: m, end: addMonthsDate(l.firstPay, m - 1), interest };
+}
+const yearsMonths = m => { const y = Math.floor(m / 12), r = m % 12; return [y ? `${y} ${y === 1 ? 'Jahr' : 'Jahren'}` : '', r ? `${r} ${r === 1 ? 'Monat' : 'Monaten'}` : ''].filter(Boolean).join(' und '); };
+const invState = i => i.paid ? 'bezahlt' : i.due && i.due < todayStr() ? 'überfällig' : 'offen';
+const offerFor = id => data.h10.offers.find(o => o.id === id);
+
+function renderH10() {
+  const H = data.h10, t = todayStr();
+  $$('#h10Tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === ui.h10Tab));
+  const trades = new Set([...TRADES, ...H.invoices.map(x => x.trade), ...H.offers.map(x => x.trade)].filter(Boolean));
+  $('#tradeList').innerHTML = [...trades].map(x => `<option value="${esc(x)}"></option>`).join('');
+  $('#firmList').innerHTML = [...new Set([...H.invoices.map(x => x.firm), ...H.offers.map(x => x.firm), ...H.loans.map(x => x.bank)].filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'de')).map(x => `<option value="${esc(x)}"></option>`).join('');
+
+  const loanSum = H.loans.reduce((x, l) => x + l.amount, 0);
+  const restSum = H.loans.reduce((x, l) => x + loanState(l, t).bal, 0);
+  const accepted = H.offers.filter(o => o.status === 'angenommen').reduce((x, o) => x + o.amount, 0);
+  const invSum = H.invoices.reduce((x, i) => x + i.amount, 0);
+  const paidSum = H.invoices.filter(i => i.paid).reduce((x, i) => x + i.amount, 0);
+  const late = H.invoices.filter(i => invState(i) === 'überfällig').length;
+  $('#h10Sum').innerHTML = `
+    <div class="stat"><span>Kredite gesamt</span><b>${eur.format(loanSum)}</b><small>Restschuld heute ${eur.format(restSum)}</small></div>
+    <div class="stat"><span>Angebote angenommen</span><b>${eur.format(accepted)}</b><small>${H.offers.filter(o => o.status === 'offen').length} noch offen</small></div>
+    <div class="stat"><span>Rechnungen gesamt</span><b>${eur.format(invSum)}</b><small>davon bezahlt ${eur.format(paidSum)}</small></div>
+    <div class="stat ${late ? 'out' : ''}"><span>Noch zu zahlen</span><b>${eur.format(invSum - paidSum)}</b><small>${late ? `${late} ${late === 1 ? 'Rechnung' : 'Rechnungen'} überfällig` : 'nichts überfällig'}</small></div>`;
+
+  let h = '';
+  if (ui.h10Tab === 'kredite') {
+    h += '<div class="row" style="margin:0 0 16px"><button class="btn small primary" data-act="loan-new">Kredit hinzufügen</button></div>';
+    h += H.loans.length ? '<div class="loan-grid">' + H.loans.map(l => {
+      const st = loanState(l, t), po = loanPayoff(l), fu = l.fixedUntil ? loanState(l, l.fixedUntil) : null;
+      const rows = [
+        ['Darlehen', eur.format(l.amount) + (l.drawn !== '' && l.drawn !== l.amount ? ` (abgerufen ${eur.format(l.drawn)})` : '')],
+        ['Sollzins', l.rate ? l.rate.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' %' : '–'],
+        ['Monatliche Rate', l.payment ? eur.format(l.payment) : '–'],
+        ['Erste Rate', fmtD(l.firstPay) || '–'],
+        ['Restschuld heute', eur.format(st.bal)],
+        ['Bisher gezahlt', `${eur.format(st.paid)} (davon Zinsen ${eur.format(st.interest)})`],
+        l.fixedUntil ? ['Zinsbindung bis', `${fmtD(l.fixedUntil)}, Restschuld dann ${eur.format(fu.bal)}`] : null,
+        po ? ['Abbezahlt', po.never ? 'nie – die Rate deckt nicht einmal die Zinsen' : `${fmtD(po.end)} (nach ${yearsMonths(po.months)}, Zinsen gesamt ${eur.format(po.interest)})`] : null
+      ].filter(Boolean);
+      return `<button class="panel loan" data-act="loan-edit" data-id="${esc(l.id)}"><span class="loan-head"><b>${esc(l.name || 'Kredit')}</b><span class="muted">${esc(l.bank)}</span></span>
+        <span class="kv">${rows.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</span>${l.note ? `<span class="muted loan-note">${esc(l.note)}</span>` : ''}</button>`;
+    }).join('') + '</div><p class="muted">Restschuld und Laufzeit sind berechnet aus Darlehen, Sollzins, Rate und Datum der ersten Rate, monatliche Annuität ohne Sondertilgungen nach dem eingetragenen Stand. Maßgeblich sind die Unterlagen deiner Bank.</p>'
+      : '<section class="panel"><p class="empty">Noch keine Kredite. Trag deine Darlehen ein, dann siehst du Restschuld, Zinsen und Laufzeit.</p></section>';
+  }
+
+  if (ui.h10Tab === 'rechnungen') {
+    const f = ui.h10Inv;
+    const list = H.invoices.filter(i => f === 'alle' || (f === 'offen' ? !i.paid : i.paid))
+      .sort((a, b) => (a.paid - b.paid) || (b.date || '').localeCompare(a.date || ''));
+    h += `<div class="fin-toolbar"><div class="row" style="margin:0"><button class="btn small primary" data-act="inv-new">Rechnung hinzufügen</button></div>
+      <div class="seg">${[['alle', 'Alle'], ['offen', 'Offen'], ['bezahlt', 'Bezahlt']].map(([k, l]) => `<button type="button" data-act="h10-inv" data-f="${k}" aria-pressed="${f === k}">${l}</button>`).join('')}</div></div>`;
+    // Kosten nach Gewerk: angenommenes Angebot gegen Rechnungen
+    const byTrade = {};
+    const add = (tr, k, v) => { tr = tr || 'Ohne Gewerk'; byTrade[tr] = byTrade[tr] || { offer: 0, inv: 0, paid: 0 }; byTrade[tr][k] += v; };
+    H.offers.filter(o => o.status === 'angenommen').forEach(o => add(o.trade, 'offer', o.amount));
+    H.invoices.forEach(i => { add(i.trade, 'inv', i.amount); if (i.paid) add(i.trade, 'paid', i.amount); });
+    const trs = Object.entries(byTrade).sort((a, b) => a[0].localeCompare(b[0], 'de'));
+    meta.fold = meta.fold || {};
+    h += `<section class="panel fold${meta.fold.trades === false ? ' closed' : ''}" data-fold="trades"><div class="fold-head"><button type="button" class="fold-btn" data-act="fold" data-k="trades" aria-expanded="${meta.fold.trades !== false}"><span class="chev" aria-hidden="true"></span>Kosten nach Gewerk</button></div>
+      <div class="fold-body">${trs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Gewerk</th><th class="r">Angebot</th><th class="r">Rechnungen</th><th class="r">Bezahlt</th><th class="r">Differenz</th></tr></thead><tbody>
+      ${trs.map(([tr, v]) => { const diff = v.offer ? v.inv - v.offer : 0; return `<tr><td>${esc(tr)}</td><td class="r">${v.offer ? eur.format(v.offer) : '–'}</td><td class="r">${eur.format(v.inv)}</td><td class="r">${eur.format(v.paid)}</td><td class="r ${diff > 0.005 ? 'neg' : ''}">${v.offer ? (diff > 0 ? '+' : '') + eur.format(diff) : '–'}</td></tr>`; }).join('')}
+      </tbody></table></div><p class="muted">Differenz = Rechnungen minus angenommenes Angebot. Rot heißt: teurer als angeboten.</p>` : '<p class="empty">Noch keine Daten.</p>'}</div></section>`;
+    h += `<section class="panel"><h2>Rechnungen</h2><div class="fin-list">${list.length ? list.map(i => {
+      const st = invState(i), o = i.offerId ? offerFor(i.offerId) : null;
+      const sub = [i.trade, i.number ? 'Nr. ' + i.number : '', i.date ? 'vom ' + fmtD(i.date) : '',
+                   i.paid ? (i.paidDate ? 'bezahlt am ' + fmtD(i.paidDate) : 'bezahlt') : i.due ? 'fällig ' + fmtD(i.due) : '', o ? 'zu Angebot ' + (o.firm || o.title) : ''].filter(Boolean).join(', ');
+      return `<button class="fin-row" data-act="inv-edit" data-id="${esc(i.id)}"><span class="t">${esc(i.firm || 'Rechnung')}${i.title ? ' – ' + esc(i.title) : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${st === 'überfällig' ? 'late' : st}">${st}</span><span class="amt">${eur.format(i.amount)}</span></button>`;
+    }).join('') : '<p class="empty">Keine Rechnungen.</p>'}</div></section>`;
+  }
+
+  if (ui.h10Tab === 'angebote') {
+    h += '<div class="row" style="margin:0 0 16px"><button class="btn small primary" data-act="offer-new">Angebot hinzufügen</button></div>';
+    const groups = {};
+    H.offers.forEach(o => { (groups[o.trade || 'Ohne Gewerk'] = groups[o.trade || 'Ohne Gewerk'] || []).push(o); });
+    const keys = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'de'));
+    h += keys.length ? keys.map(k => {
+      const list = groups[k].sort((a, b) => a.amount - b.amount);
+      const cmp = list.filter(o => o.status !== 'abgelehnt');
+      const min = cmp.length > 1 ? Math.min(...cmp.map(o => o.amount)) : null;
+      return `<section class="panel offer-group"><div class="panel-head"><h2>${esc(k)}</h2><button class="btn small" data-act="offer-new" data-trade="${esc(k === 'Ohne Gewerk' ? '' : k)}">Weiteres Angebot</button></div><div class="fin-list">${list.map(o => {
+        const inv = data.h10.invoices.filter(i => i.offerId === o.id).reduce((x, i) => x + i.amount, 0);
+        const expired = o.status === 'offen' && o.validUntil && o.validUntil < t;
+        const sub = [o.title, o.date ? 'vom ' + fmtD(o.date) : '', o.validUntil ? (expired ? 'abgelaufen am ' : 'gültig bis ') + fmtD(o.validUntil) : '',
+                     inv ? 'abgerechnet ' + eur.format(inv) : ''].filter(Boolean).join(', ');
+        return `<button class="fin-row${o.status === 'abgelehnt' ? ' ended' : ''}" data-act="offer-edit" data-id="${esc(o.id)}"><span class="t">${esc(o.firm || 'Angebot')}${min !== null && o.amount === min && o.status !== 'abgelehnt' ? ' <span class="tag">günstigstes</span>' : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${expired ? 'late' : o.status}">${expired ? 'abgelaufen' : o.status}</span><span class="amt">${eur.format(o.amount)}</span></button>`;
+      }).join('')}</div></section>`;
+    }).join('') : '<section class="panel"><p class="empty">Noch keine Angebote. Trag sie mit Gewerk ein, dann werden Angebote für dasselbe Gewerk nebeneinander verglichen.</p></section>';
+  }
+  $('#h10Body').innerHTML = h;
+}
+
+function editLoan(id) {
+  const l = id ? data.h10.loans.find(x => x.id === id) : null;
+  if (id && !l) return;
+  openDialog({
+    title: l ? 'Kredit bearbeiten' : 'Neuer Kredit',
+    fields: [
+      { name: 'name', label: 'Bezeichnung', value: l ? l.name : '', required: true, half: true },
+      { name: 'bank', label: 'Bank', value: l ? l.bank : '', list: 'firmList', half: true },
+      { name: 'amount', label: 'Darlehensbetrag in €', value: l ? num2(l.amount) : '', required: true, inputmode: 'decimal', half: true },
+      { name: 'drawn', label: 'Davon abgerufen (optional)', value: l && l.drawn !== '' ? num2(l.drawn) : '', inputmode: 'decimal', half: true },
+      { name: 'rate', label: 'Sollzins in %', value: l ? String(l.rate).replace('.', ',') : '', inputmode: 'decimal', half: true },
+      { name: 'payment', label: 'Monatliche Rate in €', value: l && l.payment ? num2(l.payment) : '', inputmode: 'decimal', half: true },
+      { name: 'firstPay', label: 'Erste Rate am', type: 'date', value: l ? l.firstPay : '', half: true },
+      { name: 'fixedUntil', label: 'Zinsbindung bis', type: 'date', value: l ? l.fixedUntil : '', half: true },
+      { name: 'extra', label: 'Sondertilgungen bisher in €', value: l && l.extra ? num2(l.extra) : '', inputmode: 'decimal' },
+      { name: 'url', label: 'Link zum Vertrag (optional)', value: l ? l.url : '', inputmode: 'url', hint: 'z. B. ein Link auf die Datei in Google Drive' },
+      { name: 'note', label: 'Notiz', type: 'textarea', value: l ? l.note : '' }],
+    onSave: v => {
+      const amount = parseAmount(v.amount);
+      if (!(amount > 0)) { toast('Bitte den Darlehensbetrag angeben.'); return false; }
+      const num = x => { const n = parseAmount(x); return isFinite(n) ? n : 0; };
+      const rec = { name: v.name.trim(), bank: v.bank.trim(), amount, drawn: v.drawn.trim() ? num(v.drawn) : '', rate: num(v.rate), payment: num(v.payment),
+                    firstPay: v.firstPay || '', fixedUntil: v.fixedUntil || '', extra: num(v.extra), url: v.url.trim(), note: (v.note || '').trim() };
+      if (l) Object.assign(l, rec); else data.h10.loans.push({ id: uid(), ...rec });
+      commit();
+    },
+    onDelete: l ? () => { data.h10.loans = data.h10.loans.filter(x => x !== l); commit(); } : null
+  });
+  if (l && l.url) addLinkButton(l.url);
+}
+function editInvoice(id, offerId) {
+  const i = id ? data.h10.invoices.find(x => x.id === id) : null;
+  if (id && !i) return;
+  const o0 = offerId ? offerFor(offerId) : null;
+  const offers = data.h10.offers.filter(o => o.status === 'angenommen' || (i && i.offerId === o.id));
+  openDialog({
+    title: i ? 'Rechnung bearbeiten' : 'Neue Rechnung',
+    fields: [
+      { name: 'firm', label: 'Firma', value: i ? i.firm : (o0 ? o0.firm : ''), required: true, list: 'firmList', half: true },
+      { name: 'trade', label: 'Gewerk', value: i ? i.trade : (o0 ? o0.trade : ''), list: 'tradeList', half: true },
+      { name: 'title', label: 'Leistung', value: i ? i.title : (o0 ? o0.title : ''), hint: 'z. B. „1. Abschlag Rohbau“ oder „Schlussrechnung Fliesen“' },
+      { name: 'number', label: 'Rechnungsnummer', value: i ? i.number : '', half: true },
+      { name: 'amount', label: 'Betrag (brutto) in €', value: i ? num2(i.amount) : '', required: true, inputmode: 'decimal', half: true },
+      { name: 'date', label: 'Rechnungsdatum', type: 'date', value: i ? i.date : todayStr(), half: true },
+      { name: 'due', label: 'Fällig am', type: 'date', value: i ? i.due : '', half: true },
+      { name: 'paid', label: 'Bezahlt', type: 'checkbox', value: i ? i.paid : false },
+      { name: 'paidDate', label: 'Bezahlt am', type: 'date', value: i ? i.paidDate : '', half: true },
+      { name: 'offerId', label: 'Zum Angebot', type: 'select', value: i ? i.offerId : (offerId || ''), half: true,
+        options: [{ value: '', label: 'Kein Angebot' }, ...offers.map(o => ({ value: o.id, label: `${o.firm || o.title} (${eur.format(o.amount)})` }))] },
+      { name: 'url', label: 'Link zum Beleg (optional)', value: i ? i.url : '', inputmode: 'url' },
+      { name: 'note', label: 'Notiz', type: 'textarea', value: i ? i.note : '' }],
+    onSave: v => {
+      const amount = parseAmount(v.amount);
+      if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben.'); return false; }
+      const paid = !!v.paid;
+      const rec = { firm: v.firm.trim(), trade: v.trade.trim(), title: v.title.trim(), number: v.number.trim(), amount, date: v.date || '', due: v.due || '',
+                    paid, paidDate: paid ? (v.paidDate || todayStr()) : '', offerId: v.offerId || '', url: v.url.trim(), note: (v.note || '').trim() };
+      if (i) Object.assign(i, rec); else data.h10.invoices.push({ id: uid(), ...rec });
+      commit();
+    },
+    onDelete: i ? () => { data.h10.invoices = data.h10.invoices.filter(x => x !== i); commit(); } : null
+  });
+  const pd = $('#dlgBody [name=paidDate]'), pc = $('#dlgBody [name=paid]');
+  const sync = () => { pd.closest('.field').style.visibility = pc.checked ? '' : 'hidden'; if (pc.checked && !pd.value) pd.value = todayStr(); };
+  pc.addEventListener('change', sync); sync();
+  if (i && i.url) addLinkButton(i.url);
+}
+function editOffer(id, trade) {
+  const o = id ? data.h10.offers.find(x => x.id === id) : null;
+  if (id && !o) return;
+  openDialog({
+    title: o ? 'Angebot bearbeiten' : 'Neues Angebot',
+    fields: [
+      { name: 'firm', label: 'Firma', value: o ? o.firm : '', required: true, list: 'firmList', half: true },
+      { name: 'trade', label: 'Gewerk', value: o ? o.trade : trade, list: 'tradeList', half: true, hint: 'Angebote mit gleichem Gewerk werden verglichen.' },
+      { name: 'title', label: 'Leistung', value: o ? o.title : '' },
+      { name: 'amount', label: 'Betrag (brutto) in €', value: o ? num2(o.amount) : '', required: true, inputmode: 'decimal', half: true },
+      { name: 'status', label: 'Status', type: 'select', value: o ? o.status : 'offen', half: true,
+        options: [{ value: 'offen', label: 'offen' }, { value: 'angenommen', label: 'angenommen' }, { value: 'abgelehnt', label: 'abgelehnt' }] },
+      { name: 'date', label: 'Angebot vom', type: 'date', value: o ? o.date : todayStr(), half: true },
+      { name: 'validUntil', label: 'Gültig bis', type: 'date', value: o ? o.validUntil : '', half: true },
+      { name: 'url', label: 'Link zum Angebot (optional)', value: o ? o.url : '', inputmode: 'url' },
+      { name: 'note', label: 'Notiz', type: 'textarea', value: o ? o.note : '' }],
+    onSave: v => {
+      const amount = parseAmount(v.amount);
+      if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben.'); return false; }
+      const rec = { firm: v.firm.trim(), trade: v.trade.trim(), title: v.title.trim(), amount, status: v.status, date: v.date || '', validUntil: v.validUntil || '',
+                    url: v.url.trim(), note: (v.note || '').trim() };
+      if (o) Object.assign(o, rec); else data.h10.offers.push({ id: uid(), ...rec });
+      commit();
+    },
+    onDelete: o ? () => { data.h10.invoices.forEach(i => { if (i.offerId === o.id) i.offerId = ''; }); data.h10.offers = data.h10.offers.filter(x => x !== o); commit(); } : null
+  });
+  if (o && o.status === 'angenommen') {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn small'; b.textContent = 'Rechnung zu diesem Angebot erfassen';
+    b.style.gridColumn = '1 / -1'; b.style.justifySelf = 'start'; b.style.marginBottom = '12px';
+    b.addEventListener('click', () => { dlg.close(); setTimeout(() => editInvoice(null, o.id), 30); });
+    $('#dlgBody').appendChild(b);
+  }
+  if (o && o.url) addLinkButton(o.url);
+}
+function addLinkButton(url) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn small'; b.textContent = 'Dokument öffnen';
+  b.style.gridColumn = '1 / -1'; b.style.justifySelf = 'start'; b.style.marginBottom = '12px';
+  b.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
+  $('#dlgBody').appendChild(b);
 }
 
 /* ---------- Dialog ---------- */
@@ -2001,6 +2329,28 @@ function findOwnIban(rows, hdr, map) {
   for (const r of rows.slice(0, hdr)) for (const c of r) { const v = normIban(c); if (/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(v)) return v; }
   return '';
 }
+/* Abgleich mit vorhandenen Buchungen: erst über den Import-Schlüssel, dann über Tag, Betrag und Empfänger.
+   Was schon da ist, bleibt unverändert, samt Kategorie, Fixkosten-Zuordnung und Notizen. */
+function planImport(acc, out) {
+  const existing = data.finance.filter(f => f.accountId === acc);
+  const byKey = new Map();
+  existing.forEach(f => { if (f.importKey && !byKey.has(f.importKey)) byKey.set(f.importKey, f); });
+  const used = new Set(), dup = new Set();
+  for (const t of out) { const f = byKey.get(t.key); if (f && !used.has(f)) { used.add(f); dup.add(t); } }
+  const similar = (f, t) => {
+    const a = partyKey(f.party || f.desc), b = partyKey(t.party || t.purpose);
+    return !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 6) === b.slice(0, 6));
+  };
+  for (const t of out) {
+    if (dup.has(t)) continue;
+    const type = t.amt < 0 ? 'ausgabe' : 'einnahme', amt = Math.abs(t.amt);
+    const cands = existing.filter(f => !used.has(f) && f.type === type && Math.abs(f.amount - amt) < 0.005 && Math.abs(dayDiff(f.date, t.date)) <= 3);
+    const hit = cands.find(f => f.date === t.date && similar(f, t)) || cands.find(f => f.date === t.date && !f.importKey)
+             || cands.find(f => f.date === t.date && f.importKey && !out.some(o => o.key === f.importKey)) || cands.find(f => similar(f, t));
+    if (hit) { used.add(hit); dup.add(t); }
+  }
+  return { dup, fresh: out.filter(t => !dup.has(t)) };
+}
 const existingKeys = acc => new Set(data.finance.filter(f => f.accountId === acc && f.importKey).map(f => f.importKey));
 function openImport() {
   imp.rows = null;
@@ -2033,11 +2383,11 @@ function renderImport() {
       : `<p class="muted">Die Datei enthält einen Kontostand vom ${esc(parseYmd(bl.date).toLocaleDateString('de-DE'))}. Hinterlegt ist schon ein neuerer, er bleibt.</p>`;
   }
   $('#impMap').innerHTML = h;
-  const { out, invalid } = impTransactions(), keys = existingKeys(acc);
-  const fresh = out.filter(t => !keys.has(t.key));
+  const { out, invalid } = impTransactions();
+  const { dup, fresh } = planImport(acc, out);
   $('#impPreview').innerHTML = out.length
     ? `<div class="imp-wrap"><table class="imp-table"><thead><tr><th>Datum</th><th>Name</th><th>Verwendungszweck</th><th class="r">Betrag</th></tr></thead><tbody>${out.slice(0, 10).map(t =>
-        `<tr${keys.has(t.key) ? ' class="dup" title="Schon vorhanden"' : ''}><td>${esc(parseYmd(t.date).toLocaleDateString('de-DE'))}</td><td>${esc(t.party)}</td><td>${esc(t.purpose)}</td><td class="r amt ${t.amt < 0 ? 'out' : 'in'}">${eur.format(t.amt)}</td></tr>`).join('')}</tbody></table></div>${out.length > 10 ? `<p class="muted">Vorschau der ersten 10 von ${out.length} Umsätzen.</p>` : ''}`
+        `<tr${dup.has(t) ? ' class="dup" title="Schon vorhanden"' : ''}><td>${esc(parseYmd(t.date).toLocaleDateString('de-DE'))}</td><td>${esc(t.party)}</td><td>${esc(t.purpose)}</td><td class="r amt ${t.amt < 0 ? 'out' : 'in'}">${eur.format(t.amt)}</td></tr>`).join('')}</tbody></table></div>${out.length > 10 ? `<p class="muted">Vorschau der ersten 10 von ${out.length} Umsätzen.</p>` : ''}`
     : '<p class="empty">Keine Umsätze erkannt. Prüfe oben, welche Spalten Datum und Betrag enthalten.</p>';
   $('#impInfo').textContent = out.length ? `${out.length} Umsätze erkannt, ${out.length - fresh.length} davon schon vorhanden${invalid ? `, ${invalid} Zeilen ohne Datum oder Betrag übersprungen` : ''}.` : '';
   $('#impGo').disabled = !fresh.length;
@@ -2058,14 +2408,14 @@ $('#impFile').addEventListener('change', async e => {
 $('#impAcc').addEventListener('change', renderImport);
 $('#impCancel').addEventListener('click', () => $('#impDlg').close());
 $('#impGo').addEventListener('click', () => {
-  const acc = $('#impAcc').value, keys = existingKeys(acc);
+  const acc = $('#impAcc').value;
   const { out } = impTransactions();
+  const { fresh } = planImport(acc, out);
   let n = 0, latest = '';
   const added = [];
   const a = data.accounts.find(x => x.id === acc);
   if (a && !a.iban && imp.ownIban) a.iban = imp.ownIban;
-  for (const t of out) {
-    if (keys.has(t.key)) continue;
+  for (const t of fresh) {
     const rec = { id: uid(), type: t.amt < 0 ? 'ausgabe' : 'einnahme', date: t.date,
       desc: t.party || t.purpose.slice(0, 80) || 'Umsatz', note: t.party ? t.purpose : '', party: t.party, cpIban: t.iban || '',
       cat: guessCat(t.party, t.purpose), amount: Math.abs(t.amt), accountId: acc, importKey: t.key, created: new Date().toISOString() };
@@ -2135,7 +2485,18 @@ document.addEventListener('click', async e => {
     case 'fin-next': ui.finMonth = addMonths(ui.finMonth, 1); renderFin(); break;
     case 'fin-type': ui.finType = d.t; renderFin(); break;
     case 'fin-tab': ui.finTab = d.tab; renderFin(); break;
-    case 'ff-toggle': ui.ffOpen = !ui.ffOpen; renderFilter(); if (ui.ffOpen) $('#ffCat').focus(); break;
+    case 'ff-toggle': ui.ffOpen = !ui.ffOpen; if (ui.ffOpen) { meta.fold = meta.fold || {}; meta.fold.list = true; saveMeta(); renderFolds(); } renderFilter(); if (ui.ffOpen) $('#ffCat').focus(); break;
+    case 'fb-toggle': ui.fbOpen = !ui.fbOpen; if (ui.fbOpen) { meta.fold = meta.fold || {}; meta.fold.list = true; saveMeta(); } renderFin(); if (ui.fbOpen) $('#finForm [name=desc]').focus(); break;
+    case 'fold': meta.fold = meta.fold || {}; meta.fold[d.k] = meta.fold[d.k] === false; saveMeta(); renderFolds(); break;
+    case 'h10-tab': ui.h10Tab = d.tab; meta.h10Tab = d.tab; saveMeta(); renderH10(); break;
+    case 'h10-inv': ui.h10Inv = d.f; renderH10(); break;
+    case 'loan-new': editLoan(null); break;
+    case 'loan-edit': editLoan(d.id); break;
+    case 'inv-new': editInvoice(null, d.offer || ''); break;
+    case 'inv-edit': editInvoice(d.id); break;
+    case 'offer-new': editOffer(null, d.trade || ''); break;
+    case 'offer-edit': editOffer(d.id); break;
+    case 'open-url': if (d.url) window.open(d.url, '_blank', 'noopener'); break;
     case 'ff-reset': ui.ff = { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }; renderFin(); break;
     case 'goto-fix': ui.finTab = 'fix'; ui.fixRange = '14'; goto('fin'); renderFin(); break;
     case 'fix-range': ui.fixRange = d.r; renderFix(); break;
