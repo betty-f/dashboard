@@ -326,7 +326,7 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 }
 
 /* Buchungsfilter */
-.ff-panel{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.ff-panel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
 .ff-panel .field{margin:0}
 .ff-actions{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px}
 #ffBtn.on{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
@@ -436,6 +436,7 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
           </div>
           <form id="ffPanel" class="panel ff-panel" autocomplete="off" hidden>
             <div class="field"><label for="ffCat">Kategorie</label><select id="ffCat" name="cat"></select></div>
+            <div class="field"><label for="ffFixed">Fixkosten</label><select id="ffFixed" name="fixed"></select></div>
             <div class="field"><label for="ffWho">An / von</label><input id="ffWho" name="who" placeholder="Name oder Text" list="ffWhoList"></div>
             <div class="field"><label for="ffMin">Betrag ab €</label><input id="ffMin" name="min" inputmode="decimal" placeholder="z. B. 1000"></div>
             <div class="field"><label for="ffMax">Betrag bis €</label><input id="ffMax" name="max" inputmode="decimal" placeholder="beliebig"></div>
@@ -677,7 +678,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { ff: { cat: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -1281,6 +1282,7 @@ const ffRange = () => ui.ff.from || ui.ff.to;
 function ffMatch(f) {
   const F = ui.ff;
   if (F.cat === '__none' ? !!f.cat : F.cat && f.cat !== F.cat) return false;
+  if (F.fixed === '__any' ? !f.fixedId : F.fixed === '__none' ? !!f.fixedId : F.fixed && f.fixedId !== F.fixed) return false;
   if (F.who && !`${f.party || ''} ${f.desc || ''} ${f.note || ''}`.toLowerCase().includes(F.who.toLowerCase().trim())) return false;
   const mn = parseAmount(F.min), mx = parseAmount(F.max);
   if (isFinite(mn) && f.amount < mn) return false;
@@ -1303,6 +1305,14 @@ function renderFilter() {
     const cats = [...new Set([...data.settings.categories, ...data.finance.map(f => f.cat).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'de'));
     sel.innerHTML = `<option value="">Alle Kategorien</option><option value="__none">Ohne Kategorie</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
     sel.value = F.cat;
+  }
+  const fsel = $('#ffFixed');
+  if (document.activeElement !== fsel) {
+    const fxs = data.fixed.filter(inAccFx).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    if (F.fixed && !F.fixed.startsWith('__') && !fxs.some(x => x.id === F.fixed)) F.fixed = '';
+    fsel.innerHTML = '<option value="">Alle Buchungen</option><option value="__any">Nur Fixkosten</option><option value="__none">Keine Fixkosten</option>' +
+      (fxs.length ? '<optgroup label="Einzelne Fixkosten">' + fxs.map(x => `<option value="${esc(x.id)}">${esc(x.name)}${fixedActive(x) ? '' : ' (beendet)'}</option>`).join('') + '</optgroup>' : '');
+    fsel.value = F.fixed;
   }
   const parties = [...new Set(data.finance.filter(inAcc).map(f => f.party || f.desc).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
   $('#ffWhoList').innerHTML = parties.slice(0, 300).map(x => `<option value="${esc(x)}"></option>`).join('');
@@ -1351,7 +1361,8 @@ function renderFin() {
   $('#ffInfo').textContent = ffActive() ? `${entries.length} ${entries.length === 1 ? 'Buchung' : 'Buchungen'} gefunden` : '';
   $('#finList').innerHTML = entries.length
     ? entries.slice(0, LIMIT).map(f => {
-        const sub = [f.cat || 'Ohne Kategorie', f.fixedId ? 'Fixkosten' : '', ui.finAccount === 'all' && multi ? accName(f.accountId) : ''].filter(Boolean).join(', ');
+        const fxName = f.fixedId ? (data.fixed.find(x => x.id === f.fixedId) || {}).name : '';
+        const sub = [f.cat || 'Ohne Kategorie', fxName ? 'Fixkosten: ' + fxName : '', ui.finAccount === 'all' && multi ? accName(f.accountId) : ''].filter(Boolean).join(', ');
         return `<button class="fin-row${f.cat === TRANSFER ? ' transfer' : ''}" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', withYear ? { day: '2-digit', month: '2-digit', year: '2-digit' } : { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}<span class="c">${esc(sub)}</span></span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`;
       }).join('') + (entries.length > LIMIT ? `<p class="muted">Die ersten ${LIMIT} von ${entries.length} Buchungen. Grenze den Filter weiter ein, um alle zu sehen.</p>` : '')
     : ffActive() ? '<p class="empty">Keine Buchungen passen zum Filter.</p>'
@@ -2125,7 +2136,7 @@ document.addEventListener('click', async e => {
     case 'fin-type': ui.finType = d.t; renderFin(); break;
     case 'fin-tab': ui.finTab = d.tab; renderFin(); break;
     case 'ff-toggle': ui.ffOpen = !ui.ffOpen; renderFilter(); if (ui.ffOpen) $('#ffCat').focus(); break;
-    case 'ff-reset': ui.ff = { cat: '', who: '', min: '', max: '', from: '', to: '' }; renderFin(); break;
+    case 'ff-reset': ui.ff = { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }; renderFin(); break;
     case 'goto-fix': ui.finTab = 'fix'; ui.fixRange = '14'; goto('fin'); renderFin(); break;
     case 'fix-range': ui.fixRange = d.r; renderFix(); break;
     case 'fix-new': editFixed(null); break;
