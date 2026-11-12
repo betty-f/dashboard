@@ -301,6 +301,30 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 #impDlg .dlg-actions{margin-top:14px;flex-wrap:wrap}
 @media (max-width:640px){.imp-top,.imp-map{grid-template-columns:1fr 1fr}}
 
+/* Finanzen: Reiter, Fixkosten, Kategorien */
+.fin-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin:0 0 16px}
+.fin-row.booked .amt,.fin-row.booked .t{color:var(--muted)}
+.fin-row.late .c{color:var(--warn)}
+.fin-row.ended{opacity:.6}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;background:var(--accent-soft);color:var(--ink);vertical-align:1px;margin-left:4px}
+.kat-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,2.2fr) 80px 80px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.kat-row:first-child{border-top:0}
+.kat-head{font-size:12.5px;font-weight:600;color:var(--muted);border-top:0;padding-bottom:2px}
+.kat-n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+.kat-n .m{display:none}
+.kat-row input:disabled{background:var(--surface-2);color:var(--muted)}
+.imp-bal{display:flex !important;margin:4px 0 10px;font-size:14px !important}
+@media (max-width:640px){
+  .kat-row{grid-template-columns:1fr auto;grid-template-areas:"n d" "k k" "c c"}
+  .kat-row > :nth-child(1){grid-area:n} .kat-row > :nth-child(2){grid-area:k} .kat-row > :nth-child(3){grid-area:c;text-align:left} .kat-row > :nth-child(4){grid-area:d}
+  .kat-head{display:none}
+  .kat-n .m{display:inline}
+  .acc-bar{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .acc-main{padding:8px 12px 2px}
+  .acc-bal{font-size:17px}
+  .acc-tools{padding:2px 12px 8px}
+}
+
 </style>
 </head>
 <body>
@@ -380,35 +404,81 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
       <section id="v-fin" class="view" hidden>
         <div class="view-head">
           <h1 class="view-title">Finanzen</h1>
-          <div class="monthbar" style="margin:0">
-            <button class="btn icon" data-act="fin-prev" aria-label="Voriger Monat">‹</button>
-            <h2 id="finTitle"></h2>
-            <button class="btn icon" data-act="fin-next" aria-label="Nächster Monat">›</button>
+          <div class="seg" id="finTabs">
+            <button type="button" data-act="fin-tab" data-tab="buchungen">Buchungen</button>
+            <button type="button" data-act="fin-tab" data-tab="fix">Fixkosten</button>
+            <button type="button" data-act="fin-tab" data-tab="kat">Kategorien</button>
           </div>
         </div>
         <div class="acc-bar" id="accBar"></div>
-        <div class="row" style="margin:0 0 16px">
-          <button class="btn small primary" data-act="imp-open">Umsätze aus CSV importieren</button>
-          <button class="btn small" data-act="acc-new">Konto hinzufügen</button>
-        </div>
-        <div class="fin-sum" id="finSum"></div>
-        <form id="finForm" class="panel fin-form" autocomplete="off">
-          <div class="seg" id="finType">
-            <button type="button" data-act="fin-type" data-t="ausgabe">Ausgabe</button>
-            <button type="button" data-act="fin-type" data-t="einnahme">Einnahme</button>
+
+        <div id="finTabBuchungen">
+          <div class="fin-toolbar">
+            <div class="row" style="margin:0">
+              <button class="btn small primary" data-act="imp-open">Umsätze aus CSV importieren</button>
+              <button class="btn small" data-act="acc-new">Konto hinzufügen</button>
+            </div>
+            <div class="monthbar" style="margin:0">
+              <button class="btn icon" data-act="fin-prev" aria-label="Voriger Monat">‹</button>
+              <h2 id="finTitle"></h2>
+              <button class="btn icon" data-act="fin-next" aria-label="Nächster Monat">›</button>
+            </div>
           </div>
-          <input name="date" type="date" required aria-label="Datum">
-          <input name="desc" required placeholder="Beschreibung" aria-label="Beschreibung">
-          <input name="cat" list="catList" placeholder="Kategorie" aria-label="Kategorie">
-          <input name="amount" required inputmode="decimal" placeholder="Betrag in €" aria-label="Betrag in Euro">
-          <select name="acc" aria-label="Konto"></select>
-          <button class="btn primary">Buchen</button>
-        </form>
-        <datalist id="catList"></datalist>
-        <div class="fin-cols">
-          <section class="panel"><h2>Ausgaben nach Kategorie</h2><div id="finCats"></div></section>
-          <section class="panel"><h2>Buchungen</h2><div id="finList" class="fin-list"></div></section>
+          <div class="fin-sum" id="finSum"></div>
+          <form id="finForm" class="panel fin-form" autocomplete="off">
+            <div class="seg" id="finType">
+              <button type="button" data-act="fin-type" data-t="ausgabe">Ausgabe</button>
+              <button type="button" data-act="fin-type" data-t="einnahme">Einnahme</button>
+            </div>
+            <input name="date" type="date" required aria-label="Datum">
+            <input name="desc" required placeholder="Beschreibung" aria-label="Beschreibung">
+            <input name="cat" list="catList" placeholder="Kategorie" aria-label="Kategorie">
+            <input name="amount" required inputmode="decimal" placeholder="Betrag in €" aria-label="Betrag in Euro">
+            <select name="acc" aria-label="Konto"></select>
+            <button class="btn primary">Buchen</button>
+          </form>
+          <div class="fin-cols">
+            <section class="panel"><h2>Ausgaben nach Kategorie</h2><div id="finCats"></div></section>
+            <section class="panel"><h2>Buchungen</h2><div id="finList" class="fin-list"></div></section>
+          </div>
         </div>
+
+        <div id="finTabFix" hidden>
+          <div class="fin-sum" id="fixSum"></div>
+          <div class="row" style="margin:0 0 16px">
+            <button class="btn small primary" data-act="fix-new">Fixkosten hinzufügen</button>
+            <button class="btn small" data-act="fix-detect">Aus Buchungen erkennen</button>
+          </div>
+          <div class="fin-cols">
+            <section class="panel">
+              <div class="panel-head"><h2>Anstehend</h2>
+                <div class="seg" id="fixRange">
+                  <button type="button" data-act="fix-range" data-r="month">Dieser Monat</button>
+                  <button type="button" data-act="fix-range" data-r="14">Nächste 14 Tage</button>
+                </div>
+              </div>
+              <div id="fixUpcoming" class="fin-list"></div>
+            </section>
+            <section class="panel"><h2>Alle Fixkosten</h2><div id="fixList" class="fin-list"></div></section>
+          </div>
+        </div>
+
+        <div id="finTabKat" hidden>
+          <section class="panel">
+            <p class="muted" style="margin-top:0">Neue Buchungen bekommen ihre Kategorie automatisch: zuerst so, wie du denselben Empfänger früher eingeordnet hast, sonst über die Stichwörter unten. Ein Stichwort passt, wenn es im Empfänger oder Verwendungszweck vorkommt. Jede Kategorie kannst du umbenennen, löschen oder um Stichwörter ergänzen. „Umbuchung“ ist fest: Geld zwischen deinen eigenen Konten zählt nicht als Einnahme oder Ausgabe.</p>
+            <div class="kat-row kat-head"><span>Kategorie</span><span>Stichwörter</span><span>Buchungen</span><span></span></div>
+            <div id="katList"></div>
+            <form id="katForm" class="addbar" style="margin:14px 0 0" autocomplete="off">
+              <input name="name" required placeholder="Neue Kategorie" aria-label="Neue Kategorie">
+              <button class="btn primary">Hinzufügen</button>
+            </form>
+            <div class="row">
+              <button class="btn" data-act="kat-apply">Buchungen neu auswerten</button>
+            </div>
+            <p class="muted">„Neu auswerten“ ordnet Buchungen ohne Kategorie zu, erkennt Umbuchungen zwischen deinen Konten und sucht nach neuen Fixkosten. Von dir selbst gesetzte Kategorien bleiben unverändert.</p>
+          </section>
+        </div>
+        <datalist id="catList"></datalist>
       </section>
 
       <section id="v-set" class="view" hidden>
@@ -474,6 +544,16 @@ const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 const LS_DATA = 'dashboard.daten', LS_META = 'dashboard.meta', LS_TOKEN = 'dashboard.token', LS_GCACHE = 'dashboard.gcache';
 const DEFAULT_CATS = ['Wohnen','Lebensmittel','Auto','Versicherungen','Freizeit','Gesundheit','Gehalt','Umbuchung','Sonstiges'];
+const DEFAULT_RULES = {
+  'Gehalt': 'gehalt, lohn, bezüge, bezuege',
+  'Lebensmittel': 'rewe, edeka, aldi, lidl, netto, penny, kaufland, norma, globus, tegut, dm-drogerie, dm drogerie, rossmann, bäcker, baecker, metzger',
+  'Versicherungen': 'versicherung, allianz, huk, ergo, axa, debeka, signal iduna, r+v, lvm, devk',
+  'Auto': 'tankstelle, aral, shell, esso, omv, agip, autohaus, kfz, adac, werkstatt',
+  'Wohnen': 'miete, nebenkosten, hausgeld, stadtwerke, strom, e.on, vodafone, telekom, o2, 1&1, rundfunk',
+  'Gesundheit': 'apotheke, arzt, ärzt, zahnarzt, klinik, physio',
+  'Freizeit': 'netflix, spotify, disney, kino, restaurant, lieferando'
+};
+const RHYTHM = { 1: 'monatlich', 3: 'vierteljährlich', 6: 'halbjährlich', 12: 'jährlich', 24: 'alle 2 Jahre' };
 const TRANSFER = 'Umbuchung';   // Geld zwischen eigenen Konten: zählt nicht als Einnahme oder Ausgabe
 
 /* ---------- Hilfsfunktionen ---------- */
@@ -532,8 +612,9 @@ function parseAmount(s) {
 /* ---------- Daten ---------- */
 function emptyData() {
   return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
-           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', startBalance: 0, startDate: '' }],
-           settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS] } };
+           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [],
+           settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS],
+                       catRules: { ...DEFAULT_RULES }, fixedIgnore: [] } };
 }
 function normalize(d) {
   const e = emptyData();
@@ -549,14 +630,20 @@ function normalize(d) {
   if (typeof s.showOwn !== 'boolean') s.showOwn = true;
   if (typeof s.showTodos !== 'boolean') s.showTodos = true;
   if (!s.categories.includes(TRANSFER)) s.categories.push(TRANSFER);
+  if (!s.catRules || typeof s.catRules !== 'object') s.catRules = { ...DEFAULT_RULES };
+  if (!Array.isArray(s.fixedIgnore)) s.fixedIgnore = [];
   let accounts = Array.isArray(d.accounts) ? d.accounts.filter(a => a && a.id).map(a => ({ id: a.id, name: a.name || 'Konto',
-    url: a.url || '', startBalance: Number(a.startBalance) || 0, startDate: a.startDate || '' })) : [];
-  if (!accounts.length) accounts = [{ id: 'konto-1', name: 'Hauptkonto', url: '', startBalance: 0, startDate: '' }];
+    url: a.url || '', iban: a.iban || '', startBalance: Number(a.startBalance) || 0, startDate: a.startDate || '', balSource: a.balSource || '' })) : [];
+  if (!accounts.length) accounts = [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }];
   const finance = (Array.isArray(d.finance) ? d.finance : []).map(f => accounts.some(a => a.id === f.accountId) ? f : { ...f, accountId: accounts[0].id });
+  const fixed = (Array.isArray(d.fixed) ? d.fixed : []).filter(x => x && x.id).map(x => ({
+    id: x.id, name: x.name || 'Fixkosten', amount: Number(x.amount) || 0, interval: [1, 3, 6, 12, 24].includes(+x.interval) ? +x.interval : 1,
+    accountId: accounts.some(a => a.id === x.accountId) ? x.accountId : accounts[0].id, cat: x.cat || '', match: x.match || '',
+    startDate: x.startDate || '', endDate: x.endDate || '', lastDate: x.lastDate || '', auto: !!x.auto, created: x.created || '' }));
   return { app: 'dashboard', version: 2, updatedAt: d.updatedAt || null,
            todos: Array.isArray(d.todos) ? d.todos : [],
            events: Array.isArray(d.events) ? d.events : [],
-           finance, accounts, settings: s };
+           finance, accounts, fixed, settings: s };
 }
 function lsGet(k, fallback) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fallback; } catch { return fallback; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn(e); } }
@@ -570,7 +657,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -993,9 +1080,12 @@ function renderHome() {
 
   const ym = t.slice(0, 7), s = finSums(ym, true);
   $('#homeFinTitle').textContent = 'Finanzen im ' + parseYmd(ym + '-01').toLocaleDateString('de-DE', { month: 'long' });
-  $('#homeFin').innerHTML = s.n
+  const t14 = fixedDue(t, addDays(t, 14), false, true);
+  const fixHtml = t14.length ? `<h3 class="group-label">Fixkosten in den nächsten 14 Tagen</h3><div class="fin-list">${t14.slice(0, 5).map(it =>
+      `<button class="fin-row" data-act="goto-fix"><span class="t">${esc(it.fx.name)}<span class="c">${esc(dueLabel(it.date))}</span></span><span class="amt out">−${eur.format(it.amount)}</span></button>`).join('')}</div>${t14.length > 5 ? `<p class="muted">und ${t14.length - 5} weitere</p>` : ''}<p class="muted" style="margin-bottom:0">Summe ${eur.format(t14.reduce((x, i) => x + i.amount, 0))}</p>` : '';
+  $('#homeFin').innerHTML = (s.n
     ? `<div class="money"><span>Einnahmen</span><span class="amt in">${eur.format(s.inc)}</span><span>Ausgaben</span><span class="amt out">${eur.format(s.exp)}</span><span class="total">Saldo</span><span class="total amt ${s.bal < 0 ? 'out' : 'in'}">${eur.format(s.bal)}</span>${data.accounts.some(a => a.startDate || a.startBalance) ? `<span class="muted">Kontostand gesamt</span><span class="amt muted">${eur.format(data.accounts.reduce((x, a) => x + accBalance(a), 0))}</span>` : ''}</div>`
-    : `<p class="empty">Noch keine Buchungen in diesem Monat.</p><div class="row"><button class="btn small" data-act="goto" data-view="fin" data-focus="#finForm [name=desc]">Buchung erfassen</button></div>`;
+    : `<p class="empty">Noch keine Buchungen in diesem Monat.</p><div class="row"><button class="btn small" data-act="goto" data-view="fin" data-focus="#finForm [name=desc]">Buchung erfassen</button></div>`) + fixHtml;
 }
 
 function todoGroups(list) {
@@ -1119,8 +1209,60 @@ function renderAccounts() {
   const total = accs.reduce((sum, a) => sum + accBalance(a), 0);
   $('#accBar').innerHTML = (accs.length > 1 ? card('all', 'Alle Konten', total, null) : '') + accs.map(a => card(a.id, a.name, accBalance(a), a)).join('');
 }
+function fixRow(it, withStatus) {
+  const t = todayStr(), multi = data.accounts.length > 1 && ui.finAccount === 'all';
+  const status = it.booked ? 'gebucht' : it.date < t ? 'noch nicht abgebucht' : '';
+  const sub = [dueLabel(it.date), multi ? accName(it.fx.accountId) : '', withStatus ? status : ''].filter(Boolean).join(', ');
+  return `<button class="fin-row${it.booked ? ' booked' : ''}${!it.booked && it.date < t ? ' late' : ''}" data-act="fix-edit" data-id="${esc(it.fx.id)}"><span class="t">${esc(it.fx.name)}<span class="c">${esc(sub)}</span></span><span class="amt out">−${eur.format(it.amount)}</span></button>`;
+}
+function renderFix() {
+  const t = todayStr(), from = t.slice(0, 7) + '-01', to = addDays(addMonthsDate(from, 1), -1);
+  const list = data.fixed.filter(inAccFx);
+  const active = list.filter(fixedActive);
+  const month = fixedDue(from, to, true);
+  const open = month.filter(x => !x.booked);
+  $('#fixSum').innerHTML = `
+    <div class="stat out"><span>Pro Monat umgerechnet</span><b>${eur.format(active.reduce((x, fx) => x + monthly(fx), 0))}</b></div>
+    <div class="stat out"><span>Diesen Monat fällig</span><b>${eur.format(month.reduce((x, i) => x + i.amount, 0))}</b></div>
+    <div class="stat"><span>Davon noch offen</span><b>${eur.format(open.reduce((x, i) => x + i.amount, 0))}</b></div>`;
+  $$('#fixRange button').forEach(b => b.setAttribute('aria-pressed', b.dataset.r === ui.fixRange));
+  const items = ui.fixRange === 'month' ? month : fixedDue(t, addDays(t, 14), false);
+  $('#fixUpcoming').innerHTML = items.length
+    ? items.map(it => fixRow(it, ui.fixRange === 'month')).join('') + `<p class="muted" style="margin-bottom:0">Summe ${eur.format(items.reduce((x, i) => x + i.amount, 0))}${ui.fixRange === 'month' ? `, davon offen ${eur.format(open.reduce((x, i) => x + i.amount, 0))}` : ''}</p>`
+    : `<p class="empty">${ui.fixRange === 'month' ? 'Diesen Monat sind keine Fixkosten fällig.' : 'In den nächsten 14 Tagen sind keine Fixkosten fällig.'}</p>`;
+  const row = fx => {
+    const nd = nextDue(fx), multi = data.accounts.length > 1 && ui.finAccount === 'all';
+    const fmt = d => parseYmd(d).toLocaleDateString('de-DE');
+    const sub = [RHYTHM[fx.interval], multi ? accName(fx.accountId) : '', fx.cat,
+                 fixedActive(fx) ? (nd ? 'nächste ' + dueLabel(nd) : '') : 'beendet ' + fmt(fx.endDate),
+                 fx.endDate && fixedActive(fx) ? 'endet ' + fmt(fx.endDate) : '',
+                 fx.startDate && fx.startDate > t ? 'ab ' + fmt(fx.startDate) : ''].filter(Boolean).join(', ');
+    return `<button class="fin-row${fixedActive(fx) ? '' : ' ended'}" data-act="fix-edit" data-id="${esc(fx.id)}"><span class="t">${esc(fx.name)}${fx.auto ? ' <span class="tag">erkannt</span>' : ''}<span class="c">${esc(sub)}</span></span><span class="amt out">−${eur.format(fx.amount)}</span></button>`;
+  };
+  const ended = list.filter(fx => !fixedActive(fx));
+  const byName = (x, y) => x.name.localeCompare(y.name, 'de');
+  $('#fixList').innerHTML = list.length
+    ? active.sort(byName).map(row).join('') + (ended.length ? '<h3 class="group-label">Beendet</h3>' + ended.sort(byName).map(row).join('') : '')
+    : '<p class="empty">Noch keine Fixkosten. Importiere Umsätze, dann werden regelmäßige Abbuchungen automatisch erkannt, oder lege sie über „Fixkosten hinzufügen“ an.</p>';
+}
+function renderKat(force) {
+  if (!force && $('#katList').contains(document.activeElement)) return;
+  const st = data.settings, counts = {};
+  data.finance.forEach(f => { if (f.cat) counts[f.cat] = (counts[f.cat] || 0) + 1; });
+  $('#katList').innerHTML = st.categories.map((c, i) => {
+    const fixed = c === TRANSFER;
+    return `<div class="kat-row"><input data-kat-name="${i}" value="${esc(c)}"${fixed ? ' disabled' : ''} aria-label="Name der Kategorie">
+      <input data-kat-kw="${i}" value="${esc(fixed ? '' : (st.catRules[c] || ''))}" placeholder="${fixed ? 'wird automatisch erkannt' : 'z. B. rewe, edeka'}"${fixed ? ' disabled' : ''} aria-label="Stichwörter für ${esc(c)}">
+      <span class="kat-n">${counts[c] || 0}<span class="m"> ${(counts[c] || 0) === 1 ? 'Buchung' : 'Buchungen'}</span></span>${fixed ? '<span></span>' : `<button class="btn small danger" data-act="kat-del" data-i="${i}" aria-label="${esc(c)} löschen">Löschen</button>`}</div>`;
+  }).join('');
+}
 function renderFin() {
+  $$('#finTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === ui.finTab));
+  $('#finTabBuchungen').hidden = ui.finTab !== 'buchungen';
+  $('#finTabFix').hidden = ui.finTab !== 'fix';
+  $('#finTabKat').hidden = ui.finTab !== 'kat';
   renderAccounts();
+  renderFix(); renderKat();
   const ym = ui.finMonth, multi = data.accounts.length > 1;
   $('#finTitle').textContent = monthName(ym);
   $$('#finType button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === ui.finType));
@@ -1149,7 +1291,7 @@ function renderFin() {
     : '<p class="empty">Keine Ausgaben in diesem Monat.</p>';
   $('#finList').innerHTML = entries.length
     ? entries.map(f => {
-        const sub = [f.cat || 'Ohne Kategorie', ui.finAccount === 'all' && multi ? accName(f.accountId) : ''].filter(Boolean).join(', ');
+        const sub = [f.cat || 'Ohne Kategorie', f.fixedId ? 'Fixkosten' : '', ui.finAccount === 'all' && multi ? accName(f.accountId) : ''].filter(Boolean).join(', ');
         return `<button class="fin-row${f.cat === TRANSFER ? ' transfer' : ''}" data-act="fin-edit" data-id="${esc(f.id)}"><span class="d">${esc(parseYmd(f.date).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }))}</span><span class="t">${esc(f.desc)}<span class="c">${esc(sub)}</span></span><span class="amt ${f.type === 'einnahme' ? 'in' : 'out'}">${f.type === 'einnahme' ? '+' : '−'}${eur.format(f.amount)}</span></button>`;
       }).join('')
     : '<p class="empty">Noch keine Buchungen in diesem Monat. Erfasse oben eine oder importiere die Umsätze deines Kontos.</p>';
@@ -1333,6 +1475,10 @@ function editFin(id) {
               { name: 'amount', label: 'Betrag in €', value: num2(f.amount), required: true, inputmode: 'decimal', half: true },
               { name: 'desc', label: 'Beschreibung', value: f.desc, required: true },
               { name: 'cat', label: 'Kategorie', value: f.cat, list: 'catList', hint: 'Umbuchungen zwischen eigenen Konten zählen nicht als Einnahme oder Ausgabe.' },
+              { name: 'fixed', label: 'Fixkosten', type: 'select', value: f.fixedId || '',
+                options: [{ value: '', label: 'Keine Fixkosten' }, ...[...data.fixed].sort((x, y) => x.name.localeCompare(y.name, 'de'))
+                  .map(x => ({ value: x.id, label: `${x.name} (${RHYTHM[x.interval]}${fixedActive(x) ? '' : ', beendet'})` })),
+                  { value: '__new', label: 'Neue Fixkosten aus dieser Buchung …' }] },
               { name: 'note', label: 'Verwendungszweck / Notiz', type: 'textarea', value: f.note });
   openDialog({
     title: 'Buchung bearbeiten',
@@ -1343,7 +1489,17 @@ function editFin(id) {
       const oldCat = f.cat || '';
       Object.assign(f, { type: v.type, date: v.date, desc: v.desc.trim(), cat: (v.cat || '').trim(), amount, note: (v.note || '').trim() });
       if (v.acc) f.accountId = v.acc;
+      if (f.cat !== oldCat) { f.catManual = true; delete f.transferWith; }
       addCategory(f.cat);
+      const oldFixed = f.fixedId || '';
+      let openNew = null;
+      if (v.fixed === '__new') {
+        const fx = { id: uid(), name: f.desc, amount: f.amount, interval: 1, accountId: f.accountId, cat: f.cat, match: f.party || f.desc,
+                     startDate: '', endDate: '', lastDate: f.date, auto: false, created: new Date().toISOString() };
+        data.fixed.push(fx); f.fixedId = fx.id; openNew = fx.id;
+      } else if (v.fixed) f.fixedId = v.fixed; else delete f.fixedId;
+      for (const id of new Set([oldFixed, f.fixedId].filter(Boolean))) { const fx = data.fixed.find(x => x.id === id); if (fx) refreshFixed(fx); }
+      if (openNew) setTimeout(() => { editFixed(openNew); toast('Lege jetzt noch den Rhythmus fest.'); }, 60);
       if (f.party && f.cat && f.cat !== oldCat) {
         const key = f.party.toLowerCase();
         const same = data.finance.filter(x => x !== f && x.party && x.party.toLowerCase() === key && x.cat !== f.cat);
@@ -1354,6 +1510,77 @@ function editFin(id) {
     },
     onDelete: () => { data.finance = data.finance.filter(x => x !== f); commit(); }
   });
+}
+function editFixed(id) {
+  const fx = id ? data.fixed.find(x => x.id === id) : null;
+  if (id && !fx) return;
+  const n = fx ? data.finance.filter(f => f.fixedId === fx.id).length : 0;
+  const multi = data.accounts.length > 1;
+  const fields = [{ name: 'name', label: 'Bezeichnung', value: fx ? fx.name : '', required: true },
+    { name: 'amount', label: fx && fx.lastDate ? 'Betrag (zuletzt abgebucht)' : 'Betrag in €', value: fx ? num2(fx.amount) : '', required: true, inputmode: 'decimal', half: true },
+    { name: 'interval', label: 'Rhythmus', type: 'select', value: String(fx ? fx.interval : 1), options: Object.entries(RHYTHM).map(([k, l]) => ({ value: k, label: l })), half: true }];
+  if (multi) fields.push({ name: 'acc', label: 'Konto', type: 'select', value: fx ? fx.accountId : (ui.finAccount !== 'all' ? ui.finAccount : data.accounts[0].id), options: data.accounts.map(a => ({ value: a.id, label: a.name })), half: true });
+  fields.push({ name: 'cat', label: 'Kategorie', value: fx ? fx.cat : '', list: 'catList', half: multi },
+    { name: 'match', label: 'Erkennen an', value: fx ? fx.match : '', hint: 'Text im Empfänger oder Verwendungszweck, z. B. der Name des Vertragspartners. Passende Buchungen werden automatisch zugeordnet.' },
+    { name: 'startDate', label: fx && fx.lastDate ? 'Beginnt am (optional)' : 'Erste Abbuchung', type: 'date', value: fx ? fx.startDate : '', half: true },
+    { name: 'endDate', label: 'Endet am (optional)', type: 'date', value: fx ? fx.endDate : '', half: true });
+  openDialog({
+    title: fx ? 'Fixkosten bearbeiten' : 'Neue Fixkosten',
+    fields,
+    onSave: v => {
+      const amount = parseAmount(v.amount);
+      if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben, zum Beispiel 12,50.'); return false; }
+      if (!(fx && fx.lastDate) && !v.startDate) { toast('Bitte das Datum der ersten Abbuchung angeben, damit die Fälligkeiten berechnet werden können.'); return false; }
+      if (v.startDate && v.endDate && v.endDate < v.startDate) { toast('Das Ende liegt vor dem Beginn.'); return false; }
+      const rec = { name: v.name.trim(), amount, interval: +v.interval, accountId: v.acc || (fx ? fx.accountId : data.accounts[0].id),
+                    cat: (v.cat || '').trim(), match: (v.match || '').trim() || v.name.trim(), startDate: v.startDate || '', endDate: v.endDate || '' };
+      let target = fx;
+      if (fx) Object.assign(fx, rec, { auto: false });
+      else { target = { id: uid(), ...rec, lastDate: '', auto: false, created: new Date().toISOString() }; data.fixed.push(target); }
+      addCategory(target.cat);
+      const free = data.finance.filter(f => !f.fixedId && fixedMatches(target, f));
+      free.forEach(f => { f.fixedId = target.id; if (!f.catManual && target.cat && !f.cat) f.cat = target.cat; });
+      const lastBefore = target.lastDate;
+      refreshFixed(target);
+      if (!target.lastDate || target.lastDate === lastBefore) target.amount = amount;   // manuell gesetzter Betrag gilt bis zur nächsten Abbuchung
+      commit();
+      if (free.length) toast(`${free.length} passende ${free.length === 1 ? 'Buchung' : 'Buchungen'} zugeordnet`);
+    },
+    onDelete: fx ? () => {
+      data.finance.forEach(f => { if (f.fixedId === fx.id) delete f.fixedId; });
+      if (fx.auto) data.settings.fixedIgnore.push(fx.accountId + '|' + partyKey(fx.match));
+      data.fixed = data.fixed.filter(x => x !== fx);
+      commit();
+    } : null
+  });
+  if (fx) {
+    const info = document.createElement('p');
+    info.className = 'muted'; info.style.gridColumn = '1 / -1'; info.style.margin = '-4px 0 12px';
+    info.textContent = n ? `${n} ${n === 1 ? 'Buchung ist' : 'Buchungen sind'} zugeordnet, zuletzt am ${parseYmd(fx.lastDate).toLocaleDateString('de-DE')}. Der Betrag folgt immer der letzten Abbuchung.` : 'Noch keine Buchung zugeordnet.';
+    $('#dlgBody').appendChild(info);
+  }
+}
+function renameCat(i, name) {
+  const st = data.settings, old = st.categories[i];
+  name = (name || '').trim();
+  if (!old || old === TRANSFER || name === old) return;
+  if (!name || st.categories.includes(name)) { toast(name ? 'Diese Kategorie gibt es schon.' : 'Der Name darf nicht leer sein.'); renderKat(true); return; }
+  st.categories[i] = name;
+  st.catRules[name] = st.catRules[old] || ''; delete st.catRules[old];
+  data.finance.forEach(f => { if (f.cat === old) f.cat = name; });
+  data.fixed.forEach(f => { if (f.cat === old) f.cat = name; });
+  commit();
+}
+function reevaluate() {
+  let nCat = 0;
+  for (const f of data.finance) if (!f.cat && !f.catManual) { const c = guessCat(f.party, `${f.note || ''} ${f.desc || ''}`); if (c) { f.cat = c; nCat++; } }
+  const nTrans = detectTransfers(data.finance);
+  const nAssign = assignFixed(data.finance.filter(f => !f.fixedId));
+  const nFix = detectFixed();
+  commit();
+  const parts = [nCat ? `${nCat} Buchungen kategorisiert` : '', nTrans ? `${nTrans} Umbuchungen erkannt` : '',
+                 nAssign ? `${nAssign} Buchungen Fixkosten zugeordnet` : '', nFix ? `${nFix} neue Fixkosten erkannt` : ''].filter(Boolean);
+  toast(parts.length ? parts.join(', ') + '.' : 'Nichts Neues gefunden.');
 }
 function parseSigned(s) {
   s = String(s ?? '').trim().replace(/\s|€|EUR/gi, '');
@@ -1376,6 +1603,7 @@ function editAccount(id) {
     title: a ? 'Konto bearbeiten' : 'Neues Konto',
     fields: [{ name: 'name', label: 'Name', value: a ? a.name : '', required: true },
              { name: 'url', label: 'Online-Banking', value: a ? a.url : '', inputmode: 'url', hint: 'Adresse der Login-Seite deiner Bank, z. B. https://www.sparkasse-passau.de' },
+             { name: 'iban', label: 'IBAN (optional)', value: a ? a.iban : '', hint: 'Hilft beim Erkennen von Umbuchungen zwischen deinen Konten. Wird beim CSV-Import meist automatisch übernommen.' },
              { name: 'startBalance', label: 'Kontostand', value: a && (a.startBalance || a.startDate) ? num2(a.startBalance) : '', inputmode: 'decimal', half: true },
              { name: 'startDate', label: 'am', type: 'date', value: a ? a.startDate : '', half: true }],
     onSave: v => {
@@ -1386,7 +1614,8 @@ function editAccount(id) {
       if (url) { try { new URL(url); } catch { toast('Die Adresse fürs Online-Banking ist ungültig.'); return false; } }
       const sb = (v.startBalance || '').trim() ? parseSigned(v.startBalance) : 0;
       if (!isFinite(sb)) { toast('Bitte einen gültigen Kontostand eingeben, zum Beispiel 1.250,00 oder -80,00.'); return false; }
-      const rec = { name, url, startBalance: sb, startDate: v.startDate || '' };
+      const rec = { name, url, iban: normIban(v.iban), startBalance: sb, startDate: v.startDate || '' };
+      if (a && (sb !== a.startBalance || rec.startDate !== a.startDate)) rec.balSource = 'manuell';
       if (a) Object.assign(a, rec);
       else { const na = { id: uid(), ...rec }; data.accounts.push(na); ui.finAccount = na.id; }
       commit();
@@ -1406,25 +1635,160 @@ function editAccount(id) {
 }
 
 /* ---------- CSV-Import ---------- */
-const CAT_RULES = [
-  [/gehalt|lohn|bezüge|bezuege/i, 'Gehalt'],
-  [/rewe|edeka|aldi|lidl|netto|penny|kaufland|norma|globus|tegut|dm[ -]drogerie|rossmann|müller|bäcker|baecker|metzger/i, 'Lebensmittel'],
-  [/versicherung|allianz|huk|ergo|axa|debeka|signal iduna|r\+v|lvm|devk/i, 'Versicherungen'],
-  [/tankstelle|aral|shell|esso|\bjet\b|omv|agip|autohaus|kfz|adac|werkstatt/i, 'Auto'],
-  [/miete|nebenkosten|hausgeld|stadtwerke|strom|e\.on|eon energie|vodafone|telekom|o2|1&1|rundfunk/i, 'Wohnen'],
-  [/apotheke|arzt|ärzt|zahnarzt|klinik|physio/i, 'Gesundheit'],
-  [/netflix|spotify|disney|kino|restaurant|lieferando|amazon prime/i, 'Freizeit']
-];
+function kwHit(text, kw) {        // kurze Stichwörter nur als eigenes Wort, längere auch als Wortteil
+  kw = kw.trim().toLowerCase();
+  if (!kw) return false;
+  if (kw.length >= 5) return text.includes(kw);
+  const e = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^a-z0-9äöüß])' + e + '([^a-z0-9äöüß]|$)').test(text);
+}
 function guessCat(party, purpose) {
   const key = (party || '').toLowerCase().trim();
   if (key) for (let i = data.finance.length - 1; i >= 0; i--) {
     const x = data.finance[i];
-    if (x.party && x.cat && x.party.toLowerCase().trim() === key) return x.cat;
+    if (x.party && x.cat && x.cat !== TRANSFER && x.party.toLowerCase().trim() === key) return x.cat;
   }
-  const txt = (party || '') + ' ' + (purpose || '');
-  for (const [re, c] of CAT_RULES) if (re.test(txt)) return c;
+  const txt = ((party || '') + ' ' + (purpose || '')).toLowerCase();
+  for (const c of data.settings.categories) {
+    if (c === TRANSFER) continue;
+    const kws = (data.settings.catRules[c] || '').split(',');
+    if (kws.some(k => kwHit(txt, k))) return c;
+  }
   return '';
 }
+
+/* ---------- Umbuchungen zwischen eigenen Konten ---------- */
+const normIban = v => (v || '').replace(/\s/g, '').toUpperCase();
+const TRANSFER_WORDS = /umbuchung|übertrag|uebertrag|eigenes konto|eigene konten/i;
+const fText = f => `${f.party || ''} ${f.note || ''} ${f.desc || ''}`;
+function detectTransfers(list) {
+  let n = 0;
+  const own = data.accounts.filter(a => a.iban).map(a => ({ id: a.id, iban: normIban(a.iban) }));
+  for (const f of list) {
+    if (f.cat === TRANSFER || f.catManual) continue;
+    const cp = normIban(f.cpIban);
+    const ibanHit = !!cp && own.some(o => o.iban === cp && o.id !== f.accountId);
+    const partner = data.accounts.length > 1 ? data.finance.find(x => x !== f && x.accountId !== f.accountId && x.type !== f.type &&
+      Math.abs(x.amount - f.amount) < 0.005 && Math.abs(dayDiff(x.date, f.date)) <= 3 && !x.transferWith && !x.catManual) : null;
+    if (ibanHit || partner || TRANSFER_WORDS.test(fText(f))) {
+      f.cat = TRANSFER; n++;
+      if (f.fixedId) { const fx = data.fixed.find(x => x.id === f.fixedId); delete f.fixedId; if (fx) refreshFixed(fx); }
+    }
+    if (partner) {
+      if (partner.cat !== TRANSFER) n++;
+      partner.cat = TRANSFER; partner.transferWith = f.id; f.transferWith = partner.id;
+      if (partner.fixedId) { const fx = data.fixed.find(x => x.id === partner.fixedId); delete partner.fixedId; if (fx) refreshFixed(fx); }
+    }
+  }
+  return n;
+}
+
+/* ---------- Fixkosten ---------- */
+const partyKey = v => (v || '').toLowerCase().replace(/[^a-zäöüß]+/g, ' ').trim().slice(0, 40);
+function addMonthsDate(ds, n) {
+  const d = parseYmd(ds), day = d.getDate();
+  const t = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  t.setDate(Math.min(day, new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()));
+  return ymd(t);
+}
+const fixedActive = fx => !fx.endDate || fx.endDate >= todayStr();
+const inAccFx = fx => ui.finAccount === 'all' || fx.accountId === ui.finAccount;
+function refreshFixed(fx) {         // Betrag = zuletzt abgebuchter Betrag, kein Durchschnitt
+  const own = data.finance.filter(f => f.fixedId === fx.id).sort((a, b) => a.date.localeCompare(b.date));
+  const last = own[own.length - 1];
+  if (last) { fx.amount = last.amount; fx.lastDate = last.date; } else fx.lastDate = '';
+}
+function fixedMatches(fx, f) {
+  if (f.type !== 'ausgabe' || f.cat === TRANSFER) return false;
+  if (fx.endDate && f.date > fx.endDate) return false;
+  if (fx.startDate && f.date < addDays(fx.startDate, -20)) return false;
+  if (fx.accountId && f.accountId !== fx.accountId) return false;
+  const m = (fx.match || '').toLowerCase().trim();
+  if (!m) return false;
+  return fText(f).toLowerCase().includes(m) || partyKey(f.party) === partyKey(fx.match);
+}
+function assignFixed(list) {
+  let n = 0;
+  for (const f of list) {
+    if (f.fixedId) continue;
+    const fx = data.fixed.find(x => fixedMatches(x, f));
+    if (fx) { f.fixedId = fx.id; if (!f.catManual && fx.cat && !f.cat) f.cat = fx.cat; n++; }
+  }
+  data.fixed.forEach(refreshFixed);
+  return n;
+}
+const INTERVALS = [[1, 26, 35], [3, 84, 98], [6, 172, 192], [12, 350, 380], [24, 715, 745]];
+function detectFixed() {
+  const groups = {};
+  for (const f of data.finance) {
+    if (f.type !== 'ausgabe' || f.cat === TRANSFER || f.fixedId || !partyKey(f.party)) continue;
+    const k = f.accountId + '|' + partyKey(f.party);
+    (groups[k] = groups[k] || []).push(f);
+  }
+  let created = 0;
+  for (const [k, list] of Object.entries(groups)) {
+    if (list.length < 2 || data.settings.fixedIgnore.includes(k)) continue;
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    const gaps = list.slice(1).map((f, i) => dayDiff(list[i].date, f.date));
+    const amts = list.map(f => f.amount);
+    if (Math.max(...amts) > 2 * Math.min(...amts)) continue;            // stark schwankende Beträge sind eher Einkäufe
+    for (const [iv, lo, hi] of INTERVALS) {
+      if (iv === 1 && list.length < 3) continue;
+      const ok = gaps.filter(g => g >= lo && g <= hi).length;
+      if (ok < Math.ceil(gaps.length * 0.8)) continue;
+      const last = list[list.length - 1];
+      if (dayDiff(last.date, todayStr()) > hi * 1.6) break;               // seit Langem nicht mehr abgebucht
+      const fx = { id: uid(), name: last.party, amount: last.amount, interval: iv, accountId: last.accountId, cat: last.cat || '',
+                   match: last.party, startDate: '', endDate: '', lastDate: last.date, auto: true, created: new Date().toISOString() };
+      data.fixed.push(fx);
+      list.forEach(f => { f.fixedId = fx.id; });
+      refreshFixed(fx);
+      created++;
+      break;
+    }
+  }
+  return created;
+}
+/* Fälligkeiten eines Fixkostenpostens in einem Zeitraum */
+function occurrences(fx, from, to) {
+  const base = fx.lastDate || fx.startDate;
+  if (!base) return [];
+  const pb = parseYmd(base), pf = parseYmd(from);
+  let k = Math.floor(((pf.getFullYear() - pb.getFullYear()) * 12 + pf.getMonth() - pb.getMonth()) / fx.interval) - 1;
+  const out = [];
+  for (let i = 0; i < 60; i++, k++) {
+    const d = addMonthsDate(base, k * fx.interval);
+    if (d < from) continue;
+    if (d > to) break;
+    if (fx.startDate && d < fx.startDate) continue;
+    if (fx.endDate && d > fx.endDate) continue;
+    out.push(d);
+  }
+  return out;
+}
+function bookedFor(fx, d) {
+  const tol = fx.interval === 1 ? 10 : 20;
+  return data.finance.find(f => f.fixedId === fx.id && Math.abs(dayDiff(f.date, d)) <= tol) || null;
+}
+function nextDue(fx) {
+  if (!fixedActive(fx)) return '';
+  const t = todayStr();
+  return occurrences(fx, addDays(t, -5), addMonthsDate(t, fx.interval + 1)).find(d => !bookedFor(fx, d)) || '';
+}
+function fixedDue(from, to, withBooked, allAccounts) {
+  const out = [];
+  for (const fx of data.fixed) {
+    if (!allAccounts && !inAccFx(fx)) continue;
+    for (const d of occurrences(fx, from, to)) {
+      const b = bookedFor(fx, d);
+      if (b && !withBooked) continue;
+      out.push({ fx, date: d, booked: b, amount: b ? b.amount : fx.amount });
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.fx.name.localeCompare(b.fx.name));
+}
+const monthly = fx => fx.amount / fx.interval;
+
 function decodeFile(buf) {
   let t;
   try { t = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
@@ -1481,7 +1845,10 @@ function autoMap(h) {
     haben: find(/^haben( \(eur\)| in eur)?$/),
     party: find(/begünstigter|beguenstigter|empfänger|empfaenger|zahlungsbeteiligter|gegenseite|^name|payee/, /zahlungspflichtige|auftraggeber/),
     payer: find(/zahlungspflichtige|auftraggeber/),
-    purpose: find(/verwendungszweck/, /buchungstext|vorgang|beschreibung|^text|description/)
+    purpose: find(/verwendungszweck/, /buchungstext|vorgang|beschreibung|^text|description/),
+    saldo: find(/^saldo|kontostand|saldo nach buchung/),
+    iban: find(/iban zahlungsbeteiligter|zahlungsbeteiligter.*iban|kontonummer\/iban|gegenkonto|empfänger.*iban|zahlungspflichtige.*iban|iban.*(empfänger|auftraggeber)/, /^iban$/),
+    ownIban: find(/^auftragskonto$|iban auftragskonto/)
   };
   if (m.payer === m.party) m.payer = -1;   // eine gemeinsame Spalte für beide Richtungen
   return m;
@@ -1513,7 +1880,7 @@ function impTransactions() {
     const clean = i => i >= 0 ? (r[i] || '').replace(/\s+/g, ' ').trim() : '';
     // Getrennte Spalten für Zahler und Empfänger (z. B. DKB): bei Eingängen zählt der Zahler
     const party = map.payer >= 0 && amt > 0 ? clean(map.payer) || clean(map.party) : clean(map.party);
-    out.push({ date, amt: Math.round(amt * 100) / 100, party, purpose: clean(map.purpose) });
+    out.push({ date, amt: Math.round(amt * 100) / 100, party, purpose: clean(map.purpose), iban: clean(map.iban) });
   }
   const seen = {};
   for (const t of out) {   // Schlüssel zum Wiedererkennen; gleiche Buchungen am selben Tag werden durchnummeriert
@@ -1522,6 +1889,45 @@ function impTransactions() {
     t.key = base + '#' + seen[base];
   }
   return { out, invalid };
+}
+/* Kontostand aus der Datei: Zeilen wie „Kontostand vom …“ im Kopf/Fuß oder eine Saldo-Spalte */
+function findBalance(rows, hdr, map) {
+  let best = null, latest = '';
+  const valid = [];
+  rows.slice(hdr + 1).forEach(r => {
+    const d = map.date >= 0 ? parseDateAny(r[map.date]) : '';
+    if (d) { if (d > latest) latest = d; valid.push({ d, r }); }
+  });
+  const consider = (date, amount, src) => {
+    if (!date || !isFinite(amount)) return;
+    if (!best || date > best.date || (date === best.date && src === 'meta')) best = { date, amount: Math.round(amount * 100) / 100, src };
+  };
+  rows.forEach((r, i) => {
+    if (i === hdr || (i > hdr && map.date >= 0 && parseDateAny(r[map.date]))) return;
+    const line = r.join(' ');
+    if (!/kontostand|saldo/i.test(line) || /alter|anfangs|vorherig|vortrag|start/i.test(line)) return;
+    const dm = line.match(/(\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2})/);
+    let amount = NaN;
+    for (let k = r.length - 1; k >= 0; k--) {
+      const c = r[k];
+      if (!/\d/.test(c) || /\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2}/.test(c) || /[a-zäöü]{3,}/i.test(c.replace(/eur/i, ''))) continue;
+      const v = parseSigned(c);
+      if (isFinite(v)) { amount = v; break; }
+    }
+    consider(dm ? parseDateAny(dm[1]) : latest, amount, 'meta');
+  });
+  if (map.saldo >= 0 && valid.length) {
+    const desc = valid[0].d > valid[valid.length - 1].d;
+    const top = valid.reduce((m, x) => x.d > m ? x.d : m, '');
+    const pick = desc ? valid.find(x => x.d === top) : [...valid].reverse().find(x => x.d === top);
+    consider(top, parseSigned(pick.r[map.saldo]), 'col');
+  }
+  return best;
+}
+function findOwnIban(rows, hdr, map) {
+  if (map.ownIban >= 0) { const r = rows[hdr + 1]; if (r && r[map.ownIban]) return normIban(r[map.ownIban]); }
+  for (const r of rows.slice(0, hdr)) for (const c of r) { const v = normIban(c); if (/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(v)) return v; }
+  return '';
 }
 const existingKeys = acc => new Set(data.finance.filter(f => f.accountId === acc && f.importKey).map(f => f.importKey));
 function openImport() {
@@ -1548,6 +1954,12 @@ function renderImport() {
   let h = `<div class="imp-map">${fields.map(([k, l]) => `<div class="field"><label for="imp_${k}">${l}</label><select id="imp_${k}" data-imp="${k}">${opts(imp.map[k])}</select></div>`).join('')}</div>`;
   if (imp.map.sh >= 0) h += `<p class="muted">Soll/Haben-Kennzeichen erkannt in der Spalte „${esc(imp.headers[imp.map.sh])}“.</p>`;
   if (imp.map.amount < 0 && (imp.map.soll >= 0 || imp.map.haben >= 0)) h += '<p class="muted">Getrennte Spalten für Soll und Haben erkannt.</p>';
+  if (imp.balance && a) {
+    const bl = imp.balance, newer = !a.startDate || bl.date >= a.startDate;
+    h += newer
+      ? `<label class="chk imp-bal"><input type="checkbox" id="impBal"${imp.useBal ? ' checked' : ''}> Kontostand aus der Datei übernehmen: <b>${eur.format(bl.amount)}</b> am ${esc(parseYmd(bl.date).toLocaleDateString('de-DE'))}</label>`
+      : `<p class="muted">Die Datei enthält einen Kontostand vom ${esc(parseYmd(bl.date).toLocaleDateString('de-DE'))}. Hinterlegt ist schon ein neuerer, er bleibt.</p>`;
+  }
   $('#impMap').innerHTML = h;
   const { out, invalid } = impTransactions(), keys = existingKeys(acc);
   const fresh = out.filter(t => !keys.has(t.key));
@@ -1567,6 +1979,7 @@ $('#impFile').addEventListener('change', async e => {
     const rows = parseCsv(text, detectDelim(text));
     if (!rows.length) throw new Error('Die Datei ist leer.');
     imp.rows = rows; imp.hdr = findHeader(rows); imp.headers = rows[imp.hdr]; imp.map = autoMap(imp.headers);
+    imp.balance = findBalance(rows, imp.hdr, imp.map); imp.useBal = true; imp.ownIban = findOwnIban(rows, imp.hdr, imp.map);
   } catch (err) { imp.rows = null; toast('Datei konnte nicht gelesen werden: ' + err.message); }
   renderImport();
 });
@@ -1576,19 +1989,32 @@ $('#impGo').addEventListener('click', () => {
   const acc = $('#impAcc').value, keys = existingKeys(acc);
   const { out } = impTransactions();
   let n = 0, latest = '';
+  const added = [];
+  const a = data.accounts.find(x => x.id === acc);
+  if (a && !a.iban && imp.ownIban) a.iban = imp.ownIban;
   for (const t of out) {
     if (keys.has(t.key)) continue;
-    data.finance.push({ id: uid(), type: t.amt < 0 ? 'ausgabe' : 'einnahme', date: t.date,
-      desc: t.party || t.purpose.slice(0, 80) || 'Umsatz', note: t.party ? t.purpose : '', party: t.party,
-      cat: guessCat(t.party, t.purpose), amount: Math.abs(t.amt), accountId: acc, importKey: t.key, created: new Date().toISOString() });
+    const rec = { id: uid(), type: t.amt < 0 ? 'ausgabe' : 'einnahme', date: t.date,
+      desc: t.party || t.purpose.slice(0, 80) || 'Umsatz', note: t.party ? t.purpose : '', party: t.party, cpIban: t.iban || '',
+      cat: guessCat(t.party, t.purpose), amount: Math.abs(t.amt), accountId: acc, importKey: t.key, created: new Date().toISOString() };
+    data.finance.push(rec); added.push(rec);
     n++;
     if (t.date > latest) latest = t.date;
+  }
+  const nTrans = detectTransfers(added);
+  assignFixed(added);
+  const nFix = detectFixed();
+  let balMsg = '';
+  if (a && imp.balance && imp.useBal && (!a.startDate || imp.balance.date >= a.startDate)) {
+    a.startBalance = imp.balance.amount; a.startDate = imp.balance.date; a.balSource = 'csv';
+    balMsg = `Kontostand ${eur.format(imp.balance.amount)} übernommen`;
   }
   $('#impDlg').close();
   ui.finAccount = data.accounts.length > 1 ? acc : ui.finAccount;
   if (latest) ui.finMonth = latest.slice(0, 7);
   commit();
-  toast(`${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} importiert. Kategorien kannst du durch Antippen einer Buchung anpassen.`);
+  toast([`${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} importiert`, nTrans ? `${nTrans} ${nTrans === 1 ? 'Umbuchung' : 'Umbuchungen'} erkannt` : '',
+         nFix ? `${nFix} neue Fixkosten erkannt` : '', balMsg].filter(Boolean).join(', ') + '.');
 });
 
 /* ---------- Bedienung ---------- */
@@ -1636,6 +2062,23 @@ document.addEventListener('click', async e => {
     case 'fin-prev': ui.finMonth = addMonths(ui.finMonth, -1); renderFin(); break;
     case 'fin-next': ui.finMonth = addMonths(ui.finMonth, 1); renderFin(); break;
     case 'fin-type': ui.finType = d.t; renderFin(); break;
+    case 'fin-tab': ui.finTab = d.tab; renderFin(); break;
+    case 'goto-fix': ui.finTab = 'fix'; ui.fixRange = '14'; goto('fin'); renderFin(); break;
+    case 'fix-range': ui.fixRange = d.r; renderFix(); break;
+    case 'fix-new': editFixed(null); break;
+    case 'fix-edit': editFixed(d.id); break;
+    case 'fix-detect': { const before = data.fixed.length; assignFixed(data.finance.filter(f => !f.fixedId)); const n = detectFixed(); commit();
+      toast(n ? `${n} neue Fixkosten erkannt` : (data.fixed.length === before ? 'Keine weiteren regelmäßigen Abbuchungen gefunden.' : 'Fixkosten aktualisiert')); break; }
+    case 'kat-apply': reevaluate(); break;
+    case 'kat-del': {
+      const c = data.settings.categories[+d.i]; if (!c || c === TRANSFER) break;
+      const n = data.finance.filter(f => f.cat === c).length;
+      if (!confirm(`Kategorie „${c}“ löschen?${n ? ` ${n} ${n === 1 ? 'Buchung wird' : 'Buchungen werden'} danach ohne Kategorie geführt.` : ''}`)) break;
+      data.settings.categories.splice(+d.i, 1); delete data.settings.catRules[c];
+      data.finance.forEach(f => { if (f.cat === c) f.cat = ''; });
+      data.fixed.forEach(f => { if (f.cat === c) f.cat = ''; });
+      commit(); renderKat(true); break;
+    }
     case 'fin-edit': editFin(d.id); break;
     case 'acc-select': ui.finAccount = d.id; renderFin(); break;
     case 'acc-edit': editAccount(d.id); break;
@@ -1663,7 +2106,10 @@ document.addEventListener('change', e => {
     return;
   }
   if (ds.colorKey) { data.settings[ds.colorKey] = e.target.value; commit(); return; }
-  if (ds.imp) { imp.map[ds.imp] = +e.target.value; renderImport(); return; }
+  if (ds.imp) { imp.map[ds.imp] = +e.target.value; if (ds.imp === 'date') imp.balance = findBalance(imp.rows, imp.hdr, imp.map); renderImport(); return; }
+  if (e.target.id === 'impBal') { imp.useBal = e.target.checked; return; }
+  if (ds.katName !== undefined) { renameCat(+ds.katName, e.target.value); return; }
+  if (ds.katKw !== undefined) { const c = data.settings.categories[+ds.katKw]; if (c) { data.settings.catRules[c] = e.target.value.trim(); commit(); } return; }
   if (ds.todo) {
     const t = data.todos.find(x => x.id === ds.todo);
     if (!t) return;
@@ -1690,6 +2136,15 @@ $('#todoForm').addEventListener('submit', e => {
   text.focus();
 });
 
+$('#katForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const inp = e.target.elements.namedItem('name'), name = inp.value.trim();
+  if (!name) return;
+  if (data.settings.categories.includes(name)) { toast('Diese Kategorie gibt es schon.'); return; }
+  data.settings.categories.push(name); data.settings.catRules[name] = '';
+  inp.value = '';
+  commit(); renderKat(true);
+});
 $('#finForm').addEventListener('submit', e => {
   e.preventDefault();
   const el = n => e.target.elements.namedItem(n);
