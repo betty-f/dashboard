@@ -435,6 +435,15 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 #h10Tabs{overflow-x:auto;max-width:100%}
 @media (max-width:640px){ .file-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .viewer{width:100vw;height:100vh;max-width:none;border-radius:0} }
 
+/* Dateien sortieren */
+.file-card{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.file-card.drag-src{opacity:.3;border-style:dashed}
+.drag-ghost{position:fixed;z-index:100;pointer-events:none;transform:scale(1.04) rotate(-1.5deg);box-shadow:0 12px 30px rgb(0 0 0 / .25);opacity:.95;margin:0}
+body.dragging{cursor:grabbing;user-select:none}
+body.dragging .file-card{cursor:grabbing}
+.drag-hint{margin:-4px 0 12px}
+.fin-toolbar .seg{max-width:100%;overflow-x:auto}
+
 </style>
 </head>
 <body>
@@ -2589,13 +2598,92 @@ function renderFilesTab() {
   let h = `<div class="fin-toolbar"><div class="row" style="margin:0"><button class="btn small primary" data-act="h10-upload">Dateien hinzufügen</button></div>
     <div class="seg">${cats.map(c => `<button type="button" data-act="h10-fcat" data-c="${c}" aria-pressed="${c === cat}">${c}${c !== 'Alle' ? ` (${F.filter(f => f.cat === c).length})` : ''}</button>`).join('')}</div></div>`;
   if (!signedIn()) h += '<p class="muted">Vorschau und Hochladen funktionieren, sobald du mit Google verbunden bist.</p>';
+  if (list.length > 1) h += `<p class="muted drag-hint">${isMobile() ? 'Zum Sortieren eine Datei gedrückt halten und an die gewünschte Stelle ziehen.' : 'Zum Sortieren eine Datei an die gewünschte Stelle ziehen. Mit der Tastatur: Datei auswählen und Alt + Pfeiltaste.'}</p>`;
   h += list.length ? `<div class="file-grid">${list.map(f => {
     const th = localPreview.get(f.id) || (fileInfo.get(f.id) || {}).thumb;
-    return `<button class="file-card" data-act="h10-file" data-id="${esc(f.id)}"><span class="file-thumb">${th ? `<img src="${esc(th)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span class="file-icon">${isPdf(f) ? 'PDF' : isImg(f) ? 'Foto' : 'Datei'}</span></span>
+    return `<button class="file-card" data-act="h10-file" data-id="${esc(f.id)}" aria-roledescription="sortierbare Datei"><span class="file-thumb">${th ? `<img src="${esc(th)}" alt="" loading="lazy" draggable="false" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span class="file-icon">${isPdf(f) ? 'PDF' : isImg(f) ? 'Foto' : 'Datei'}</span></span>
       <span class="file-name">${esc(f.title || f.name)}</span><span class="file-meta">${esc(f.cat)}, ${esc(fmtD((f.created || '').slice(0, 10)))}</span></button>`;
   }).join('')}</div>` : `<section class="panel"><p class="empty">${F.length ? 'Keine Dateien in dieser Kategorie.' : 'Noch keine Dateien. Füge Pläne, Fotos oder PDFs hinzu. Sie werden in deinem Google Drive im Ordner „Dashboard / Hausbau H10 / Dateien“ gespeichert.'}</p></section>`;
   return h;
 }
+
+/* Reihenfolge der Dateien per Ziehen ändern (Maus, Finger und Tastatur) */
+const drag = { card: null, active: false, ghost: null, timer: null, x: 0, y: 0, dx: 0, dy: 0, suppress: false };
+function saveFileOrder() {
+  const grid = $('.file-grid');
+  if (!grid) return;
+  const ids = [...grid.querySelectorAll('.file-card')].map(c => c.dataset.id);
+  const shown = new Set(ids), byId = new Map(data.h10.files.map(f => [f.id, f]));
+  let k = 0;
+  const next = data.h10.files.map(f => shown.has(f.id) ? byId.get(ids[k++]) : f);   // nur die sichtbaren Plätze neu belegen
+  if (next.some((f, i) => f !== data.h10.files[i])) { data.h10.files = next; commit(); }
+}
+function dragStart() {
+  const c = drag.card, r = c.getBoundingClientRect();
+  drag.active = true; drag.dx = drag.x - r.left; drag.dy = drag.y - r.top;
+  const g = c.cloneNode(true);
+  g.className = 'file-card drag-ghost';
+  g.style.width = r.width + 'px'; g.style.height = r.height + 'px';
+  g.style.left = r.left + 'px'; g.style.top = r.top + 'px';
+  document.body.appendChild(g);
+  drag.ghost = g;
+  c.classList.add('drag-src');
+  document.body.classList.add('dragging');
+  if (navigator.vibrate) try { navigator.vibrate(15); } catch {}
+}
+function dragEnd(save) {
+  clearTimeout(drag.timer);
+  if (drag.ghost) drag.ghost.remove();
+  if (drag.card) drag.card.classList.remove('drag-src');
+  document.body.classList.remove('dragging');
+  const was = drag.active;
+  Object.assign(drag, { card: null, active: false, ghost: null, timer: null });
+  if (was) { drag.suppress = true; setTimeout(() => { drag.suppress = false; }, 50); if (save) saveFileOrder(); }
+}
+document.addEventListener('pointerdown', e => {
+  const c = e.target.closest('.file-grid .file-card');
+  if (!c || e.button !== 0) return;
+  Object.assign(drag, { card: c, active: false, x: e.clientX, y: e.clientY });
+  if (e.pointerType !== 'mouse') drag.timer = setTimeout(() => { if (drag.card === c) dragStart(); }, 350);   // am Handy: gedrückt halten
+});
+document.addEventListener('pointermove', e => {
+  if (!drag.card) return;
+  if (!drag.active) {
+    const dist = Math.hypot(e.clientX - drag.x, e.clientY - drag.y);
+    if (e.pointerType === 'mouse' && dist > 6) { drag.x = e.clientX; drag.y = e.clientY; dragStart(); }
+    else if (e.pointerType !== 'mouse' && dist > 10) { dragEnd(false); return; }   // das war Scrollen
+    else return;
+  }
+  e.preventDefault();
+  drag.ghost.style.left = (e.clientX - drag.dx) + 'px';
+  drag.ghost.style.top = (e.clientY - drag.dy) + 'px';
+  const t = document.elementFromPoint(e.clientX, e.clientY);
+  const over = t && t.closest('.file-grid .file-card');
+  if (over && over !== drag.card) {
+    const r = over.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+    over.parentNode.insertBefore(drag.card, after ? over.nextSibling : over);
+  }
+  if (e.clientY < 70) window.scrollBy(0, -14);
+  else if (e.clientY > innerHeight - 90) window.scrollBy(0, 14);
+}, { passive: false });
+document.addEventListener('pointerup', () => { if (drag.card) dragEnd(true); });
+document.addEventListener('pointercancel', () => { if (drag.card) dragEnd(drag.active); });
+document.addEventListener('touchmove', e => { if (drag.active) e.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', e => { if (e.target.closest('.file-grid .file-card')) e.preventDefault(); });
+document.addEventListener('click', e => { if (drag.suppress && e.target.closest('.file-card')) { e.stopPropagation(); e.preventDefault(); } }, true);
+document.addEventListener('keydown', e => {
+  const c = e.target.closest && e.target.closest('.file-grid .file-card');
+  if (!c || !e.altKey || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+  e.preventDefault();
+  const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+  const sib = back ? c.previousElementSibling : c.nextElementSibling;
+  if (!sib) return;
+  c.parentNode.insertBefore(c, back ? sib : sib.nextSibling);
+  const id = c.dataset.id;
+  saveFileOrder();
+  const again = document.querySelector(`.file-card[data-id="${CSS.escape(id)}"]`);
+  if (again) again.focus();
+});
 
 /* Anhänge bei Rechnungen und Angeboten: werden sofort hochgeladen, beim Abbrechen wieder entfernt */
 function attachUI(rec, kind, nameBase) {
