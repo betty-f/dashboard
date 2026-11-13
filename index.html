@@ -354,7 +354,10 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 @media (max-width:800px){ .lbl-l{display:none} .lbl-s{display:inline} }
 
 /* Hausbau H10 */
-.h10-sum{grid-template-columns:repeat(4,minmax(0,1fr))}
+.h10-sum{grid-template-columns:repeat(5,minmax(0,1fr))}
+.stat.avail{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+.stat.avail b{color:var(--accent)}
+.fin-row.static{cursor:default}
 .stat small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
 .loan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-bottom:12px}
 .loan{display:flex;flex-direction:column;justify-content:flex-start;text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
@@ -376,7 +379,8 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 .tbl td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 .tbl .r{text-align:right;white-space:nowrap}
 .tbl .neg{color:var(--danger);font-weight:600}
-@media (max-width:900px){ .h10-sum{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:1100px){ .h10-sum{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:900px){ .h10-sum{grid-template-columns:repeat(2,minmax(0,1fr))} .h10-sum .avail{grid-column:1/-1} }
 @media (max-width:640px){ .loan-grid{grid-template-columns:1fr} .nav button{font-size:10px} }
 
 /* Anstehende Fixkosten */
@@ -389,6 +393,22 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 .fix-pend .amt{font-size:18px;font-weight:650}
 .fix-pend.done{cursor:default;border-left-color:var(--accent);color:var(--muted)}
 .iban-toggle.on{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+
+/* Kredite: Tilgungsplan und Belastung */
+.kv-wide{grid-template-columns:auto 1fr auto 1fr;gap:6px 18px}
+@media (max-width:760px){.kv-wide{grid-template-columns:auto 1fr}}
+.tbl.click tbody tr{cursor:pointer}
+.tbl.click tbody tr:hover td{background:var(--surface-2)}
+.tbl tr.sel td{background:var(--accent-soft)}
+.tbl tr.cur td{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.tbl tr.gone td{opacity:.45}
+.tbl tr.free td{color:var(--muted)}
+.tbl td.mix{font-size:13px;color:var(--muted);line-height:1.5}
+.tbl.plan td{padding:4px 6px;font-size:13.5px;white-space:nowrap}
+.pin{width:96px;padding:4px 6px;font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums}
+.pin.note{width:170px;text-align:left}
+.pin:placeholder-shown{color:var(--muted)}
+.loan.bsp{border-left:4px solid var(--event)}
 
 </style>
 </head>
@@ -635,6 +655,7 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
   <div class="dlg-actions"><span id="impInfo" class="muted"></span><span class="spacer"></span><button type="button" class="btn" id="impCancel">Abbrechen</button><button type="button" class="btn primary" id="impGo" disabled>Importieren</button></div>
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<input type="file" id="xlsInput" accept=".xlsx,.xlsm,.xls" hidden>
 <input type="file" id="importInput" accept=".json,application/json" hidden>
 
 <script>
@@ -720,7 +741,7 @@ function parseAmount(s) {
 /* ---------- Daten ---------- */
 function emptyData() {
   return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
-           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [], h10: { loans: [], invoices: [], offers: [] },
+           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [], h10: { loans: [], invoices: [], offers: [], bausparer: [] },
            settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS],
                        catRules: { ...DEFAULT_RULES }, fixedIgnore: [] } };
 }
@@ -753,7 +774,16 @@ function normalize(d) {
   const arr = v => Array.isArray(v) ? v.filter(x => x && x.id) : [];
   const h10 = {
     loans: arr(h.loans).map(x => ({ id: x.id, bank: x.bank || '', name: x.name || '', amount: Number(x.amount) || 0, drawn: x.drawn === '' || x.drawn == null ? '' : Number(x.drawn) || 0,
-      rate: Number(x.rate) || 0, payment: Number(x.payment) || 0, firstPay: x.firstPay || '', fixedUntil: x.fixedUntil || '', extra: Number(x.extra) || 0, note: x.note || '', url: x.url || '' })),
+      rate: Number(x.rate) || 0, payment: Number(x.payment) || 0, firstPay: x.firstPay || '', fixedUntil: x.fixedUntil || '', extra: Number(x.extra) || 0, note: x.note || '', url: x.url || '',
+      payoutDate: x.payoutDate || '', effRate: Number(x.effRate) || 0, followRate: Number(x.followRate) || 0, stPerYear: Number(x.stPerYear) || 0,
+      bzRate: Number(x.bzRate) || 0, bzFrom: x.bzFrom || '', fees: Number(x.fees) || 0, oneTime: Number(x.oneTime) || 0, payInterestFree: !!x.payInterestFree,
+      plan: x.plan && Array.isArray(x.plan.rows) ? { rows: x.plan.rows.filter(r => r && r.d), source: x.plan.source || '' } : null })),
+    bausparer: arr(h.bausparer).map(x => ({ id: x.id, name: x.name || '', institute: x.institute || '', sum: Number(x.sum) || 0, start: x.start || '',
+      fee: Number(x.fee) || 0, feeFromBalance: x.feeFromBalance !== false, saving: Number(x.saving) || 0, savingFrom: x.savingFrom || '', savingRate: Number(x.savingRate) || 0,
+      minPct: x.minPct === undefined ? 0 : Number(x.minPct) || 0, allotDate: x.allotDate || '', bonus: Number(x.bonus) || 0, allotBalance: x.allotBalance === '' || x.allotBalance == null ? '' : Number(x.allotBalance) || 0,
+      loanAmount: x.loanAmount === '' || x.loanAmount == null ? '' : Number(x.loanAmount) || 0, loanRate: Number(x.loanRate) || 0, loanPayment: Number(x.loanPayment) || 0,
+      replacesLoanId: x.replacesLoanId || '', anchorAmount: x.anchorAmount === '' || x.anchorAmount == null ? '' : Number(x.anchorAmount) || 0, anchorDate: x.anchorDate || '',
+      url: x.url || '', note: x.note || '' })),
     invoices: arr(h.invoices).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', number: x.number || '', date: x.date || '',
       amount: Number(x.amount) || 0, due: x.due || '', paid: !!x.paid, paidDate: x.paidDate || '', offerId: x.offerId || '', url: x.url || '', note: x.note || '' })),
     offers: arr(h.offers).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', date: x.date || '', amount: Number(x.amount) || 0,
@@ -776,7 +806,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { fbOpen: false, h10Tab: meta.h10Tab || 'kredite', h10Inv: 'alle', ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { h10Detail: null, h10Year: '', fbOpen: false, h10Tab: meta.h10Tab || 'kredite', h10Inv: 'alle', ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -1551,10 +1581,335 @@ function loanPayoff(l) {
   while (bal > 0.005 && m < 1200) { const z = bal * r; interest += z; bal = bal + z - Math.min(l.payment, bal + z); m++; }
   return { months: m, end: addMonthsDate(l.firstPay, m - 1), interest };
 }
+/* ---- Tilgungsplan: aus eingelesenen oder berechneten Zeilen, bei jeder Änderung neu durchgerechnet ---- */
+const monthEnd = ym => { const [y, m] = ym.split('-').map(Number); return ymd(new Date(y, m, 0)); };
+const hasPlan = l => !!(l.plan && l.plan.rows && l.plan.rows.length);
+const rateAt = (l, d) => l.followRate && l.fixedUntil && d > l.fixedUntil ? l.followRate : l.rate;
+function calcPlan(l) {
+  if (!hasPlan(l)) return [];
+  let bal = 0, drawn = 0;
+  const out = [];
+  for (const r of l.plan.rows) {
+    if (r.draw) { bal += r.draw; drawn += r.draw; }
+    if (r.kind === 'draw') { out.push({ ...r, interest: 0, principal: 0, bz: 0, pay: 0, st: 0, cost: 0, balance: bal }); continue; }
+    if (bal <= 0.005 && !r.draw) { out.push({ ...r, interest: 0, principal: 0, bz: 0, pay: 0, st: 0, cost: 0, balance: 0, done: true }); continue; }
+    const rate = rateAt(l, r.d);
+    const interest = bal * rate / 100 / 12;
+    const bzAuto = l.bzRate && l.bzFrom && r.d >= l.bzFrom ? Math.max(0, l.amount - drawn) * l.bzRate / 100 : 0;
+    const bz = r.bz === null || r.bz === undefined || r.bz === '' ? bzAuto : Number(r.bz) || 0;
+    let pay = Number(r.pay) || 0, st = Number(r.st) || 0, cost = Number(r.cost) || 0, principal = 0;
+    if (pay > 0) {
+      if (bal + interest + cost - pay - st < 0) pay = Math.max(0, bal + interest + cost - st);   // letzte Rate
+      principal = pay - interest;
+      bal = bal + interest + cost - pay - st;
+    } else {                                   // tilgungsfrei: Zinsen laufen, Restschuld bleibt
+      st = Math.min(st, bal);
+      bal -= st;
+    }
+    if (bal < 0.005) bal = 0;
+    out.push({ ...r, interest, principal, bz, bzAuto: r.bz === null || r.bz === undefined || r.bz === '', pay, st, cost, balance: bal, free: !(Number(r.pay) > 0), rate });
+  }
+  return out;
+}
+const planCache = new WeakMap();
+function planOf(l) {
+  const key = JSON.stringify([l.plan, l.rate, l.followRate, l.fixedUntil, l.bzRate, l.bzFrom, l.amount]);
+  const c = planCache.get(l);
+  if (c && c.key === key) return c.rows;
+  const rows = calcPlan(l);
+  planCache.set(l, { key, rows });
+  return rows;
+}
+/* Abgerufener Teil eines Kredits bis zu einem Datum */
+function drawnAt(l, date) {
+  if (hasPlan(l)) return l.plan.rows.filter(r => r.draw && (r.d || '') <= date).reduce((x, r) => x + r.draw, 0);
+  if (l.drawn !== '') return l.drawn;
+  return l.payoutDate && l.payoutDate > date ? 0 : l.amount;
+}
+const availableAt = (l, date) => Math.max(0, l.amount - drawnAt(l, date));
+const replacedBy = l => data.h10.bausparer.find(b => b.replacesLoanId === l.id && b.allotDate) || null;
+function loanBalanceAt(l, date) {
+  const rb = replacedBy(l);
+  if (rb && date > rb.allotDate) return 0;
+  if (hasPlan(l)) {
+    let bal = 0;
+    for (const r of planOf(l)) { if ((r.d || '') <= date) bal = r.balance; else break; }
+    return bal;
+  }
+  if (l.firstPay && date < l.firstPay) return (l.drawn === '' ? l.amount : l.drawn) - (l.extra || 0);
+  return loanState(l, date).bal;
+}
+/* Monatliche Belastung eines Kredits: Map JJJJ-MM → Betrag */
+function loanCharges(l) {
+  const map = new Map(), rb = replacedBy(l), stop = rb ? rb.allotDate.slice(0, 7) : '9999-99';
+  if (hasPlan(l)) {
+    for (const r of planOf(l)) {
+      if (r.kind === 'draw' || r.done) continue;
+      const ym = r.d.slice(0, 7);
+      if (ym > stop) break;
+      const v = (r.pay > 0 ? r.pay : (l.payInterestFree ? r.interest + r.cost : 0)) + r.bz;
+      if (v > 0.005) map.set(ym, (map.get(ym) || 0) + v);
+    }
+    return map;
+  }
+  if (!l.firstPay || !l.payment) return map;
+  const po = loanPayoff(l);
+  const end = po && !po.never ? po.end.slice(0, 7) : addMonths(l.firstPay.slice(0, 7), 600);
+  for (let ym = l.firstPay.slice(0, 7); ym <= end && ym <= stop; ym = addMonths(ym, 1)) map.set(ym, l.payment);
+  return map;
+}
+/* Bausparer: Sparphase bis zur Zuteilung, danach Bauspardarlehen */
+function calcBsp(b) {
+  const res = { rows: [], guthaben: 0, loanAmt: 0, minNeed: b.sum * b.minPct / 100, savedInterest: 0, loanInterest: 0, loanEnd: '', saveEnd: '' };
+  if (!b.savingFrom && !b.anchorDate) return res;
+  let ym, bal;
+  if (b.anchorDate && b.anchorAmount !== '') { ym = addMonths(b.anchorDate.slice(0, 7), 1); bal = b.anchorAmount; }
+  else { ym = b.savingFrom.slice(0, 7); bal = b.feeFromBalance ? -b.fee : 0; }
+  const allot = b.allotDate ? b.allotDate.slice(0, 7) : addMonths(ym, 600);
+  for (let i = 0; ym <= allot && i < 900; i++, ym = addMonths(ym, 1)) {
+    const z = Math.max(0, bal) * b.savingRate / 100 / 12;
+    const pay = b.savingFrom && ym >= b.savingFrom.slice(0, 7) ? b.saving : 0;
+    bal += pay + z; res.savedInterest += z;
+    res.rows.push({ ym, d: monthEnd(ym), phase: 'spar', pay, interest: z, balance: bal });
+  }
+  res.saveEnd = b.allotDate || '';
+  if (!b.allotDate) { res.guthaben = bal; return res; }
+  res.guthaben = b.allotBalance !== '' ? b.allotBalance : bal + b.bonus;
+  res.loanAmt = b.loanAmount !== '' ? b.loanAmount : Math.max(0, b.sum - res.guthaben);
+  let rest = res.loanAmt;
+  for (let i = 0; rest > 0.005 && b.loanPayment > 0 && i < 600; i++, ym = addMonths(ym, 1)) {
+    const z = rest * b.loanRate / 100 / 12;
+    if (b.loanPayment <= z) break;
+    const pay = Math.min(b.loanPayment, rest + z);
+    rest = rest + z - pay; res.loanInterest += z;
+    res.rows.push({ ym, d: monthEnd(ym), phase: 'darlehen', pay, interest: z, balance: Math.max(0, rest) });
+    res.loanEnd = monthEnd(ym);
+  }
+  return res;
+}
+function bspChargeMap(b) {
+  const map = new Map();
+  calcBsp(b).rows.forEach(r => { if (r.pay > 0.005) map.set(r.ym, (map.get(r.ym) || 0) + r.pay); });
+  return map;
+}
+/* Gesamte monatliche Belastung als Zeiträume mit gleichem Betrag */
+function chargeTimeline() {
+  const H = data.h10;
+  const items = [...H.loans.map(l => ({ name: l.name || l.bank || 'Kredit', map: loanCharges(l), st: l.stPerYear || 0 })),
+                 ...H.bausparer.map(b => ({ name: (b.name || 'Bausparer') + '', map: bspChargeMap(b), st: 0 }))];
+  const keys = items.flatMap(i => [...i.map.keys()]);
+  if (!keys.length) return [];
+  let ym = keys.reduce((a, b) => a < b ? a : b), end = keys.reduce((a, b) => a > b ? a : b);
+  const periods = [];
+  let cur = null;
+  for (let i = 0; ym <= end && i < 1200; i++, ym = addMonths(ym, 1)) {
+    const parts = items.map(it => ({ name: it.name, amt: Math.round((it.map.get(ym) || 0) * 100) / 100, st: it.st })).filter(x => x.amt > 0.005);
+    const st = parts.reduce((x, p) => x + p.st, 0);
+    const sig = parts.map(p => p.name + ':' + p.amt).join('|') + '|' + st;
+    if (cur && cur.sig === sig) { cur.to = ym; cur.n++; }
+    else { cur = { sig, from: ym, to: ym, n: 1, parts, total: parts.reduce((x, p) => x + p.amt, 0), st }; periods.push(cur); }
+  }
+  return periods.filter(p => p.total > 0.005 || periods.length === 1);
+}
+const fmtYm = ym => `${ym.slice(5, 7)}.${ym.slice(0, 4)}`;
 const yearsMonths = m => { const y = Math.floor(m / 12), r = m % 12; return [y ? `${y} ${y === 1 ? 'Jahr' : 'Jahren'}` : '', r ? `${r} ${r === 1 ? 'Monat' : 'Monaten'}` : ''].filter(Boolean).join(' und '); };
 const invState = i => i.paid ? 'bezahlt' : i.due && i.due < todayStr() ? 'überfällig' : 'offen';
 const offerFor = id => data.h10.offers.find(o => o.id === id);
 
+/* ---- Excel einlesen (SheetJS wird erst bei Bedarf geladen) ---- */
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = res;
+    sc.onerror = () => rej(new Error('Der Excel-Leser konnte nicht geladen werden. Bitte die Internetverbindung prüfen.'));
+    document.head.appendChild(sc);
+  });
+}
+const serialYmd = n => { const d = new Date(Math.round((n - 25569) * 86400000)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; };
+const xDate = v => typeof v === 'number' && v > 20000 && v < 80000 ? serialYmd(v) : typeof v === 'string' ? (parseDateAny((v.match(/\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2}/) || [''])[0]) || '') : '';
+const xNum = v => typeof v === 'number' ? v : typeof v === 'string' ? parseAmount(v) : NaN;
+const pctIn = v => isFinite(v) ? Math.round((Math.abs(v) < 1 ? v * 100 : v) * 1e6) / 1e6 : 0;      // 0,0292 → 2,92 %
+/* Kopfdaten als Paare „Bezeichnung → Wert“ oberhalb der Tabelle */
+function xlsHeadPairs(rows, upto) {
+  const out = [];
+  rows.slice(0, upto).forEach(r => {
+    for (let c = 0; c < r.length; c++) {
+      const lab = r[c];
+      if (typeof lab !== 'string' || !/[a-zäöü]{3}/i.test(lab)) continue;
+      let val = null, extra = '';
+      for (let k = c + 1; k <= c + 2 && k < r.length; k++) if (r[k] !== null && r[k] !== '' ) { if (val === null) val = r[k]; else { extra = r[k]; break; } }
+      if (val === null || (typeof val === 'string' && /[a-zäöü]{4}/i.test(val) && !/\d/.test(val))) continue;
+      out.push({ label: lab.trim(), val, extra, next: r[c + 3] });
+    }
+  });
+  return out;
+}
+function parseXlsBook(wb) {
+  const sheets = [];
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+    const title = (rows.find(r => r.some(v => typeof v === 'string')) || []).find(v => typeof v === 'string') || name;
+    const hi = rows.findIndex(r => r.some(v => typeof v === 'string' && /zins/i.test(v)) && r.some(v => typeof v === 'string' && /rest/i.test(v)));
+    const pairs = xlsHeadPairs(rows, hi >= 0 ? hi : Math.min(rows.length, 16));
+    const isBsp = /bauspar/i.test(title) || pairs.some(x => /bausparsumme/i.test(x.label));
+    sheets.push({ name, title, rows, hi, pairs, isBsp, isPlan: hi >= 0 && !isBsp });
+  }
+  return sheets;
+}
+const findPair = (pairs, re) => pairs.find(x => re.test(x.label));
+function parseLoanSheet(sh) {
+  const head = {}, P = sh.pairs;
+  const v = re => { const x = findPair(P, re); return x ? x.val : null; };
+  head.name = sh.title;
+  if (isFinite(xNum(v(/darlehenssumme/i)))) head.amount = xNum(v(/darlehenssumme/i));
+  head.payoutDate = xDate(v(/auszahlungstermin|auszahlung am/i));
+  if (isFinite(xNum(v(/sollzins/i)))) head.rate = pctIn(xNum(v(/sollzins/i)));
+  if (isFinite(xNum(v(/eff/i)))) head.effRate = pctIn(xNum(v(/eff/i)));
+  if (isFinite(xNum(v(/annuit|monatl.*rate/i)))) head.payment = xNum(v(/annuit|monatl.*rate/i));
+  const bz = findPair(P, /bereitstellungszins/i);
+  if (bz && isFinite(xNum(bz.val))) { head.bzRate = pctIn(xNum(bz.val)); head.bzFrom = xDate(bz.label); }
+  if (isFinite(xNum(v(/sondertilgung/i)))) head.stPerYear = xNum(v(/sondertilgung/i));
+  if (isFinite(xNum(v(/abschlu/i)))) head.fees = xNum(v(/abschlu/i));
+  if (isFinite(xNum(v(/einmalkosten/i)))) head.oneTime = xNum(v(/einmalkosten/i));
+  const rs = findPair(P, /restschuld nach/i);
+  if (rs) head.fixedUntil = xDate(rs.extra) || '';
+  // Tabelle
+  const hdr = sh.rows[sh.hi].map(x => typeof x === 'string' ? x.toLowerCase() : '');
+  const col = re => hdr.findIndex(h => re.test(h));
+  const cZ = col(/zins/), cT = col(/tilgung/), cK = col(/kosten/), cR = col(/rest/), cS = col(/sonder/), cB = col(/bereitst/);
+  let cP = col(/zahlbetrag|^\s*rate|annuit/);
+  if (cP < 0) cP = hdr.findIndex(h => /zahl/.test(h) && !/tilgung|zins/.test(h));
+  let cD = 0;
+  const rowsOut = [];
+  for (const r of sh.rows.slice(sh.hi + 1)) {
+    const label = r.find((x, i) => typeof x === 'string' && i < 3) || '';
+    const note = r.slice(Math.max(cR, cP) + 1).find(x => typeof x === 'string') || '';
+    if (/auszahlung/i.test(label) && isFinite(xNum(r[cR]))) { rowsOut.push({ kind: 'draw', d: xDate(r[cD]) || head.payoutDate || '', label: 'Auszahlung', draw: xNum(r[cR]) }); continue; }
+    const d = xDate(r[cD]);
+    if (!d) continue;
+    const num = c => c >= 0 && isFinite(xNum(r[c])) ? xNum(r[c]) : 0;
+    const row = { d, label: label.trim(), pay: num(cP), st: cS >= 0 ? num(cS) : 0, bz: cB >= 0 && isFinite(xNum(r[cB])) ? xNum(r[cB]) : null, cost: num(cK), note: typeof note === 'string' ? note.trim() : '' };
+    if (cT >= 0 && cP < 0) row.pay = num(cZ) + num(cT);       // ohne Zahlbetrag-Spalte: Zins + Tilgung
+    rowsOut.push(row);
+    if (/zinsbindung/i.test(row.note) && !head.fixedUntil) head.fixedUntil = d;
+  }
+  if (!rowsOut.some(r => r.kind === 'draw') && head.amount) rowsOut.unshift({ kind: 'draw', d: head.payoutDate || (rowsOut[0] ? rowsOut[0].d : ''), label: 'Auszahlung', draw: head.amount });
+  const fp = rowsOut.find(r => r.kind !== 'draw' && r.pay > 0);
+  if (fp) head.firstPay = fp.d;
+  return { head, rows: rowsOut };
+}
+function parseBspSheets(sheets) {
+  const out = {};
+  for (const sh of sheets.filter(x => x.isBsp)) {
+    const P = sh.pairs, loanSheet = /tilgung|darlehen/i.test(sh.name);
+    const v = re => { const x = findPair(P, re); return x ? x.val : null; };
+    if (!out.name) out.name = (sh.title || '').replace(/^bausparvertrag\s*/i, '').replace(/["„“]/g, '').trim() || 'Bausparer';
+    const n = re => xNum(v(re));
+    if (isFinite(n(/bausparsumme/i))) out.sum = n(/bausparsumme/i);
+    if (xDate(v(/vertragsbeginn/i))) out.start = xDate(v(/vertragsbeginn/i));
+    const sp = findPair(P, /sparbeitrag/i);
+    if (sp && isFinite(xNum(sp.val))) { out.saving = xNum(sp.val); out.savingFrom = xDate(sp.label) || out.savingFrom || ''; }
+    if (isFinite(n(/zinssatz bausparguthaben|guthabenzins/i))) out.savingRate = pctIn(n(/zinssatz bausparguthaben|guthabenzins/i));
+    if (isFinite(n(/abschlu/i))) out.fee = n(/abschlu/i);
+    const mp = findPair(P, /mindestsparguthaben/i);
+    if (mp) { const m = mp.label.match(/(\d+(?:[.,]\d+)?)\s*%/); if (m) out.minPct = parseFloat(m[1].replace(',', '.')); }
+    const ge = findPair(P, /guthaben (am ende|p\.|per|zum)/i);
+    if (ge && isFinite(xNum(ge.val))) { out.allotBalance = xNum(ge.val); const d = xDate(ge.label); if (d) out.allotDate = d; }
+    if (isFinite(n(/^bauspardarlehen/i))) out.loanAmount = n(/^bauspardarlehen/i);
+    if (loanSheet && isFinite(n(/sollzins gebunden|sollzins/i))) out.loanRate = pctIn(n(/sollzins gebunden|sollzins/i));
+    if (!loanSheet && out.loanRate === undefined && isFinite(n(/sollzins gebunden/i))) out.loanRate = pctIn(n(/sollzins gebunden/i));
+    const tb = findPair(P, /tilgung ab/i);
+    if (tb && isFinite(xNum(tb.val))) out.loanPayment = xNum(tb.val);
+    // Ende der Sparphase aus der Tabelle (letzte Zeile mit Sparbeitrag)
+    if (!loanSheet && sh.hi < 0) {
+      const lastSave = sh.rows.filter(r => xDate(r[0]) && isFinite(xNum(r[1])) && xNum(r[1]) > 0).pop();
+      if (lastSave && !out.allotDate) out.allotDate = xDate(lastSave[0]);
+      const bonus = sh.rows.find(r => r.some(x => typeof x === 'string' && /wohnungsbaupr/i.test(x)));
+      if (bonus) { const d = r => isFinite(xNum(r)) ? xNum(r) : 0; const val = Math.abs(d(bonus[3])); if (val) out.bonus = val; }
+    }
+  }
+  return out;
+}
+let xlsCtx = null;
+async function openXls(kind, id) {
+  xlsCtx = { kind, id };
+  $('#xlsInput').click();
+}
+async function onXlsFile(file) {
+  try {
+    toast('Excel-Datei wird gelesen …');
+    await loadXlsx();
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const sheets = parseXlsBook(wb);
+    if (xlsCtx.kind === 'loan') {
+      const l = data.h10.loans.find(x => x.id === xlsCtx.id);
+      const plans = sheets.filter(x => x.isPlan);
+      if (!l) return;
+      if (!plans.length) { toast('In dieser Datei wurde kein Tilgungsplan gefunden. Erwartet wird eine Tabelle mit Spalten wie „Zinsanteil“, „Tilgung“ und „Restdarlehen“.'); return; }
+      const parsed = plans.map(sh => ({ sh, ...parseLoanSheet(sh) }));
+      const guess = parsed.findIndex(x => l.name && x.sh.title.toLowerCase().includes(l.name.toLowerCase())) ;
+      openDialog({
+        title: 'Tilgungsplan einlesen',
+        fields: [
+          { name: 'sheet', label: 'Tabellenblatt', type: 'select', value: String(guess >= 0 ? guess : 0),
+            options: parsed.map((x, i) => ({ value: String(i), label: `${x.sh.name} (${x.rows.filter(r => r.kind !== 'draw').length} Monate${x.head.amount ? ', ' + eur.format(x.head.amount) : ''})` })) },
+          { name: 'head', label: 'Kopfdaten übernehmen (Betrag, Zins, Rate, Zinsbindung, Sondertilgung, Bereitstellungszins …)', type: 'checkbox', value: true }],
+        onSave: v => {
+          const x = parsed[+v.sheet];
+          if (hasPlan(l) && !confirm('Den vorhandenen Tilgungsplan dieses Kredits ersetzen? Deine Änderungen daran gehen dabei verloren.')) return false;
+          if (v.head) {
+            const h = { ...x.head };
+            if (l.name) delete h.name;
+            Object.entries(h).forEach(([k, val]) => { if (val !== '' && val !== undefined && val !== null && !(typeof val === 'number' && !isFinite(val))) l[k] = val; });
+          }
+          l.plan = { rows: x.rows, source: `${file.name}, Blatt „${x.sh.name}“` };
+          ui.h10Detail = { kind: 'loan', id: l.id };
+          commit();
+          toast(`${x.rows.filter(r => r.kind !== 'draw').length} Monate eingelesen`);
+        }
+      });
+    } else {
+      const bsp = parseBspSheets(sheets);
+      if (!Object.keys(bsp).length) { toast('In dieser Datei wurden keine Bausparer-Daten gefunden.'); return; }
+      editBsp(xlsCtx.id, bsp);
+      toast('Werte aus Excel eingetragen. Bitte prüfen und speichern.');
+    }
+  } catch (e) { toast('Einlesen fehlgeschlagen: ' + e.message); }
+}
+/* Plan aus den Kopfdaten berechnen, wenn es keine Excel-Datei gibt */
+function buildPlan(l) {
+  const start = l.payoutDate || l.firstPay;
+  if (!start || !l.amount || !l.payment || !l.firstPay) { toast('Dafür braucht der Kredit Betrag, Auszahlungstermin oder erste Rate und die monatliche Rate.'); return false; }
+  const rows = [{ kind: 'draw', d: start, label: 'Auszahlung', draw: l.drawn === '' ? l.amount : l.drawn }];
+  let ym = start.slice(0, 7);
+  if (start.slice(8) !== monthEnd(ym).slice(8) || !l.payoutDate) { /* erste Zeile am Monatsende */ }
+  for (let i = 0; i < 720; i++, ym = addMonths(ym, 1)) {
+    const d = monthEnd(ym);
+    const tf = d < l.firstPay.slice(0, 7) + '-01';
+    rows.push({ d, label: tf ? 'tilgungsfrei' : 'Tilgung', pay: tf ? 0 : l.payment, st: 0, bz: null, cost: 0, note: l.fixedUntil && ym === l.fixedUntil.slice(0, 7) ? 'Ende Zinsbindung' : '' });
+  }
+  l.plan = { rows, source: 'aus den Kopfdaten berechnet' };
+  const calc = calcPlan(l);
+  const last = calc.findIndex(r => r.kind !== 'draw' && r.balance === 0);
+  if (last > 0) l.plan.rows = rows.slice(0, last + 1);
+  return true;
+}
+
+/* Berechnete Pläne nach einer zusätzlichen Auszahlung verlängern, bis die Restschuld getilgt ist */
+function extendPlan(l) {
+  if (!hasPlan(l) || !/kopfdaten/i.test(l.plan.source || '') || !l.payment) return;
+  for (let guard = 0; guard < 720; guard++) {
+    const calc = calcPlan(l), last = calc[calc.length - 1];
+    if (!last || last.balance <= 0.005) break;
+    const ym = addMonths(last.d.slice(0, 7), 1);
+    l.plan.rows.push({ d: monthEnd(ym), label: 'Tilgung', pay: l.payment, st: 0, bz: null, cost: 0, note: '' });
+  }
+  const calc = calcPlan(l);
+  const end = calc.findIndex(r => r.kind !== 'draw' && r.balance === 0 && !l.plan.rows.slice(calc.indexOf(r) + 1).some(x => x.draw));
+  if (end > 0) l.plan.rows = l.plan.rows.slice(0, end + 1);
+}
 function renderH10() {
   const H = data.h10, t = todayStr();
   $$('#h10Tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === ui.h10Tab));
@@ -1564,37 +1919,24 @@ function renderH10() {
     .sort((a, b) => a.localeCompare(b, 'de')).map(x => `<option value="${esc(x)}"></option>`).join('');
 
   const loanSum = H.loans.reduce((x, l) => x + l.amount, 0);
-  const restSum = H.loans.reduce((x, l) => x + loanState(l, t).bal, 0);
+  const drawnSum = H.loans.reduce((x, l) => x + Math.min(l.amount, drawnAt(l, t)), 0);
+  const availSum = H.loans.reduce((x, l) => x + availableAt(l, t), 0);
+  const availParts = H.loans.filter(l => availableAt(l, t) > 0.005);
+  const restSum = H.loans.reduce((x, l) => x + loanBalanceAt(l, t), 0) + H.bausparer.reduce((x, b) => {
+    const r = calcBsp(b).rows.filter(z => z.phase === 'darlehen' && z.d <= t).pop(); return x + (r ? r.balance : 0); }, 0);
   const accepted = H.offers.filter(o => o.status === 'angenommen').reduce((x, o) => x + o.amount, 0);
   const invSum = H.invoices.reduce((x, i) => x + i.amount, 0);
   const paidSum = H.invoices.filter(i => i.paid).reduce((x, i) => x + i.amount, 0);
   const late = H.invoices.filter(i => invState(i) === 'überfällig').length;
   $('#h10Sum').innerHTML = `
+    <div class="stat avail"><span>Kredite noch verfügbar</span><b>${eur.format(availSum)}</b><small>${loanSum ? `abgerufen ${eur.format(drawnSum)} von ${eur.format(loanSum)}` : 'noch keine Kredite'}${availParts.length ? '<br>' + availParts.map(l => `${esc(l.name || l.bank || 'Kredit')}: ${eur.format(availableAt(l, t))}`).join('<br>') : ''}</small></div>
     <div class="stat"><span>Kredite gesamt</span><b>${eur.format(loanSum)}</b><small>Restschuld heute ${eur.format(restSum)}</small></div>
     <div class="stat"><span>Angebote angenommen</span><b>${eur.format(accepted)}</b><small>${H.offers.filter(o => o.status === 'offen').length} noch offen</small></div>
     <div class="stat"><span>Rechnungen gesamt</span><b>${eur.format(invSum)}</b><small>davon bezahlt ${eur.format(paidSum)}</small></div>
     <div class="stat ${late ? 'out' : ''}"><span>Noch zu zahlen</span><b>${eur.format(invSum - paidSum)}</b><small>${late ? `${late} ${late === 1 ? 'Rechnung' : 'Rechnungen'} überfällig` : 'nichts überfällig'}</small></div>`;
 
   let h = '';
-  if (ui.h10Tab === 'kredite') {
-    h += '<div class="row" style="margin:0 0 16px"><button class="btn small primary" data-act="loan-new">Kredit hinzufügen</button></div>';
-    h += H.loans.length ? '<div class="loan-grid">' + H.loans.map(l => {
-      const st = loanState(l, t), po = loanPayoff(l), fu = l.fixedUntil ? loanState(l, l.fixedUntil) : null;
-      const rows = [
-        ['Darlehen', eur.format(l.amount) + (l.drawn !== '' && l.drawn !== l.amount ? ` (abgerufen ${eur.format(l.drawn)})` : '')],
-        ['Sollzins', l.rate ? l.rate.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' %' : '–'],
-        ['Monatliche Rate', l.payment ? eur.format(l.payment) : '–'],
-        ['Erste Rate', fmtD(l.firstPay) || '–'],
-        ['Restschuld heute', eur.format(st.bal)],
-        ['Bisher gezahlt', `${eur.format(st.paid)} (davon Zinsen ${eur.format(st.interest)})`],
-        l.fixedUntil ? ['Zinsbindung bis', `${fmtD(l.fixedUntil)}, Restschuld dann ${eur.format(fu.bal)}`] : null,
-        po ? ['Abbezahlt', po.never ? 'nie – die Rate deckt nicht einmal die Zinsen' : `${fmtD(po.end)} (nach ${yearsMonths(po.months)}, Zinsen gesamt ${eur.format(po.interest)})`] : null
-      ].filter(Boolean);
-      return `<button class="panel loan" data-act="loan-edit" data-id="${esc(l.id)}"><span class="loan-head"><b>${esc(l.name || 'Kredit')}</b><span class="muted">${esc(l.bank)}</span></span>
-        <span class="kv">${rows.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</span>${l.note ? `<span class="muted loan-note">${esc(l.note)}</span>` : ''}</button>`;
-    }).join('') + '</div><p class="muted">Restschuld und Laufzeit sind berechnet aus Darlehen, Sollzins, Rate und Datum der ersten Rate, monatliche Annuität ohne Sondertilgungen nach dem eingetragenen Stand. Maßgeblich sind die Unterlagen deiner Bank.</p>'
-      : '<section class="panel"><p class="empty">Noch keine Kredite. Trag deine Darlehen ein, dann siehst du Restschuld, Zinsen und Laufzeit.</p></section>';
-  }
+  if (ui.h10Tab === 'kredite') h += ui.h10Detail ? renderLoanDetail() : renderLoanList();
 
   if (ui.h10Tab === 'rechnungen') {
     const f = ui.h10Inv;
@@ -1642,35 +1984,240 @@ function renderH10() {
   $('#h10Body').innerHTML = h;
 }
 
+function renderLoanList() {
+  const H = data.h10, t = todayStr(), ymNow = t.slice(0, 7), yNow = t.slice(0, 4);
+  let h = '';
+  // Monatliche Belastung
+  const per = chargeTimeline();
+  const curP = per.find(p => p.from <= ymNow && ymNow <= p.to);
+  const stYear = H.loans.filter(l => loanBalanceAt(l, t) > 0).reduce((x, l) => x + (l.stPerYear || 0), 0);
+  const stUsed = H.loans.reduce((x, l) => x + planOf(l).filter(r => r.d && r.d.slice(0, 4) === yNow).reduce((y, r) => y + (r.st || 0), 0), 0);
+  meta.fold = meta.fold || {};
+  h += `<section class="panel fold${meta.fold.charges === false ? ' closed' : ''}" data-fold="charges"><div class="fold-head"><button type="button" class="fold-btn" data-act="fold" data-k="charges" aria-expanded="${meta.fold.charges !== false}"><span class="chev" aria-hidden="true"></span>Monatliche Belastung</button></div>
+    <div class="fold-body">${per.length ? `
+      <div class="fin-sum" style="margin-bottom:12px">
+        <div class="stat out"><span>Aktuell pro Monat</span><b>${eur.format(curP ? curP.total : 0)}</b><small>${curP ? `bis ${fmtYm(curP.to)}` : 'derzeit keine Zahlungen'}</small></div>
+        <div class="stat"><span>Sondertilgung möglich ${yNow}</span><b>${eur.format(stYear)}</b><small>≈ ${eur.format(stYear / 12)} pro Monat</small></div>
+        <div class="stat"><span>Sondertilgung eingeplant ${yNow}</span><b>${eur.format(stUsed)}</b><small>${stYear ? `noch ${eur.format(Math.max(0, stYear - stUsed))} frei` : 'im Tilgungsplan eintragen'}</small></div>
+      </div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Zeitraum</th><th class="r">Monate</th><th class="r">pro Monat</th><th>Zusammensetzung</th><th class="r">Sondertilgung p. a.</th></tr></thead><tbody>
+      ${per.map(p => `<tr${p === curP ? ' class="cur"' : ''}><td>${fmtYm(p.from)}${p.to !== p.from ? ' – ' + fmtYm(p.to) : ''}${p === curP ? ' <span class="tag">aktuell</span>' : ''}</td><td class="r">${p.n}</td><td class="r"><b>${eur.format(p.total)}</b></td>
+        <td class="mix">${p.parts.map(x => `${esc(x.name)} ${eur.format(x.amt)}`).join('<br>') || '–'}</td><td class="r">${p.st ? eur.format(p.st) : '–'}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="muted">Berechnet aus den Tilgungsplänen bzw. den Kopfdaten. Sondertilgungen sind nicht in den Monatsbeträgen enthalten.${H.loans.some(l => hasPlan(l) && !l.payInterestFree && planOf(l).some(r => r.free && r.interest > 0 && r.kind !== 'draw')) ? ' In tilgungsfreien Monaten zählt nur, was im Plan als Zahlbetrag steht. Werden die Zinsen dort monatlich abgebucht, aktiviere das in den Kopfdaten des Kredits.' : ''}</p>`
+      : '<p class="empty">Noch keine Zahlungen. Trag Kredite oder einen Bausparer ein.</p>'}</div></section>`;
+  h += '<div class="row" style="margin:0 0 16px"><button class="btn small primary" data-act="loan-new">Kredit hinzufügen</button><button class="btn small" data-act="bsp-new">Bausparer hinzufügen</button></div>';
+  if (!H.loans.length && !H.bausparer.length) return h + '<section class="panel"><p class="empty">Noch keine Kredite. Trag deine Darlehen ein und lies den Tilgungsplan aus Excel ein, dann siehst du Restschuld, Zinsen und die monatliche Belastung.</p></section>';
+  h += '<div class="loan-grid">';
+  for (const l of H.loans) {
+    const plan = planOf(l), rb = replacedBy(l);
+    const fuOk = l.fixedUntil && !(rb && l.fixedUntil > rb.allotDate);
+    const fu = fuOk ? loanBalanceAt(l, l.fixedUntil) : null;
+    const lastPay = plan.filter(r => r.pay > 0).pop();
+    const po = hasPlan(l) ? null : loanPayoff(l);
+    const interestAll = hasPlan(l) ? plan.filter(r => !rb || (r.d || '') <= rb.allotDate).reduce((x, r) => x + (r.interest || 0), 0) : (po && !po.never ? po.interest : 0);
+    const stY = plan.filter(r => r.d && r.d.slice(0, 4) === yNow).reduce((x, r) => x + (r.st || 0), 0);
+    const rows = [
+      ['Darlehen', eur.format(l.amount)],
+      availableAt(l, t) > 0.005 || drawnAt(l, t) < l.amount - 0.005 ? ['Abgerufen', `${eur.format(Math.min(l.amount, drawnAt(l, t)))}, verfügbar ${eur.format(availableAt(l, t))}`] : null,
+      ['Sollzins', l.rate ? l.rate.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' %' + (l.effRate ? `, effektiv ${l.effRate.toLocaleString('de-DE', { maximumFractionDigits: 3 })} %` : '') : '–'],
+      ['Monatliche Rate', l.payment ? eur.format(l.payment) : '–'],
+      ['Restschuld heute', eur.format(loanBalanceAt(l, t))],
+      l.fixedUntil ? ['Zinsbindung bis', fuOk ? `${fmtD(l.fixedUntil)}, Restschuld dann ${eur.format(fu)}` : fmtD(l.fixedUntil)] : null,
+      rb ? ['Abgelöst', `am ${fmtD(rb.allotDate)} durch ${rb.name || 'Bausparer'}`] : lastPay ? ['Letzte Rate', fmtD(lastPay.d)] : po ? ['Abbezahlt', po.never ? 'nie – die Rate deckt nicht einmal die Zinsen' : fmtD(po.end)] : null,
+      interestAll ? [rb ? 'Zinsen bis Ablösung' : 'Zinsen gesamt', eur.format(interestAll)] : null,
+      l.stPerYear ? ['Sondertilgung', `bis ${eur.format(l.stPerYear)} pro Jahr, ${yNow} eingeplant ${eur.format(stY)}`] : null,
+      ['Tilgungsplan', hasPlan(l) ? `${plan.filter(r => r.kind !== 'draw').length} Monate, ${l.plan.source}` : 'noch keiner']
+    ].filter(Boolean);
+    h += `<button class="panel loan" data-act="loan-open" data-id="${esc(l.id)}"><span class="loan-head"><b>${esc(l.name || 'Kredit')}</b><span class="muted">${esc(l.bank)}</span></span>
+      <span class="kv">${rows.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</span></button>`;
+  }
+  for (const b of H.bausparer) {
+    const c = calcBsp(b), now = c.rows.filter(r => r.d <= monthEnd(ymNow)).pop();
+    const target = H.loans.find(l => l.id === b.replacesLoanId);
+    const need = target && b.allotDate ? loanBalanceAt({ ...target }, b.allotDate) : 0;
+    const rows = [
+      ['Bausparsumme', eur.format(b.sum)],
+      ['Sparbeitrag', b.saving ? `${eur.format(b.saving)} pro Monat` : '–'],
+      [now && now.phase === 'darlehen' ? 'Restschuld heute' : 'Guthaben heute', now ? eur.format(now.balance) : '–'],
+      b.allotDate ? ['Zuteilung', `${fmtD(b.allotDate)}, Guthaben dann ${eur.format(c.guthaben)}`] : null,
+      c.minNeed ? ['Mindestguthaben', `${eur.format(c.minNeed)} (${b.minPct.toLocaleString('de-DE')} %) ${c.guthaben >= c.minNeed ? 'erreicht' : 'noch nicht erreicht'}`] : null,
+      c.loanAmt ? ['Bauspardarlehen', `${eur.format(c.loanAmt)}, ${b.loanRate.toLocaleString('de-DE')} %, Rate ${eur.format(b.loanPayment)}${c.loanEnd ? ', bis ' + fmtD(c.loanEnd) : ''}`] : null,
+      target ? ['Löst ab', `${target.name || 'Kredit'}: Restschuld ${eur.format(need)}, ${c.guthaben + c.loanAmt >= need - 0.005 ? 'gedeckt' : 'Lücke ' + eur.format(need - c.guthaben - c.loanAmt)}`] : null
+    ].filter(Boolean);
+    h += `<button class="panel loan bsp" data-act="bsp-open" data-id="${esc(b.id)}"><span class="loan-head"><b>${esc(b.name || 'Bausparer')}</b><span class="muted">${esc(b.institute || 'Bausparer')}</span></span>
+      <span class="kv">${rows.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</span></button>`;
+  }
+  return h + '</div><p class="muted">Restschuld und Zinsen sind berechnet. Maßgeblich bleiben die Unterlagen deiner Bank bzw. Bausparkasse.</p>';
+}
+function renderLoanDetail() {
+  const H = data.h10, det = ui.h10Detail, t = todayStr();
+  let h = '<div class="row" style="margin:0 0 14px"><button class="btn small" data-act="loan-back">‹ Alle Kredite</button></div>';
+  if (det.kind === 'loan') {
+    const l = H.loans.find(x => x.id === det.id);
+    if (!l) { ui.h10Detail = null; return renderLoanList(); }
+    const plan = planOf(l);
+    h += `<section class="panel"><div class="panel-head"><h2>${esc(l.name || 'Kredit')}${l.bank ? ' <span class="muted">' + esc(l.bank) + '</span>' : ''}</h2>
+      <div class="row" style="margin:0"><button class="btn small" data-act="loan-edit" data-id="${esc(l.id)}">Kopfdaten bearbeiten</button></div></div>
+      <div class="kv kv-wide">${[
+        ['Darlehenssumme', eur.format(l.amount)], ['Auszahlung', fmtD(l.payoutDate) || '–'], ['Sollzins', l.rate ? l.rate.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' %' : '–'],
+        ['Effektivzins', l.effRate ? l.effRate.toLocaleString('de-DE', { maximumFractionDigits: 3 }) + ' %' : '–'], ['Monatliche Rate', l.payment ? eur.format(l.payment) : '–'], ['Erste Rate', fmtD(l.firstPay) || '–'],
+        ['Zinsbindung bis', fmtD(l.fixedUntil) || '–'], ['Anschlusszins (Annahme)', l.followRate ? l.followRate.toLocaleString('de-DE') + ' %' : 'wie Sollzins'],
+        ['Sondertilgung pro Jahr', l.stPerYear ? eur.format(l.stPerYear) : '–'], ['Bereitstellungszins', l.bzRate ? `${l.bzRate.toLocaleString('de-DE')} % pro Monat${l.bzFrom ? ' ab ' + fmtD(l.bzFrom) : ''}` : '–'],
+        ['Abschlussgebühren', l.fees ? eur.format(l.fees) : '–'], ['Einmalkosten', l.oneTime ? eur.format(l.oneTime) : '–']
+      ].map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></section>`;
+    h += `<div class="row" style="margin:16px 0"><button class="btn small primary" data-act="xls-loan" data-id="${esc(l.id)}">Tilgungsplan aus Excel einlesen</button>
+      <button class="btn small" data-act="plan-build" data-id="${esc(l.id)}">Plan aus Kopfdaten berechnen</button>
+      <button class="btn small" data-act="draw-add" data-id="${esc(l.id)}">Auszahlung erfassen</button>${hasPlan(l) ? `<button class="btn small danger" data-act="plan-del" data-id="${esc(l.id)}">Plan entfernen</button>` : ''}</div>`;
+    const draws = hasPlan(l) ? l.plan.rows.map((r, i) => ({ r, i })).filter(x => x.r.draw) : [];
+    h += `<section class="panel" style="margin-bottom:16px"><div class="panel-head"><h2>Auszahlungen</h2><span class="muted">verfügbar ${eur.format(availableAt(l, t))} von ${eur.format(l.amount)}</span></div>
+      ${draws.length ? `<div class="fin-list">${draws.map(x => `<div class="fin-row static"><span class="d">${esc(fmtD(x.r.d) || '–')}</span><span class="t">${esc(x.r.label || 'Auszahlung')}${x.r.d > t ? '<span class="c">geplant</span>' : ''}</span>
+        <span class="amt">${eur.format(x.r.draw)}</span><button class="btn small danger" data-act="draw-del" data-id="${esc(l.id)}" data-i="${x.i}" aria-label="Auszahlung löschen">Löschen</button></div>`).join('')}</div>`
+        : `<p class="empty">${hasPlan(l) ? 'Keine Auszahlung im Plan.' : l.drawn !== '' ? `Abgerufen laut Kopfdaten: ${eur.format(l.drawn)}.` : 'Ohne Tilgungsplan gilt der Kredit ab dem Auszahlungstermin als voll ausgezahlt. Trag Teilauszahlungen über „Auszahlung erfassen“ ein.'}</p>`}
+      <p class="muted" style="margin-bottom:0">Noch nicht abgerufene Beträge sind die Grundlage für die automatisch berechneten Bereitstellungszinsen.</p></section>`;
+    if (!hasPlan(l)) return h + '<section class="panel"><p class="empty">Noch kein Tilgungsplan. Lies ihn aus deiner Excel-Datei ein oder lass ihn aus den Kopfdaten berechnen. Danach kannst du jede Zeile bearbeiten, z. B. Sondertilgungen oder Bereitstellungszinsen eintragen.</p></section>';
+    // Jahresübersicht
+    const years = {};
+    plan.forEach(r => { if (!r.d) return; const y = r.d.slice(0, 4); const o = years[y] = years[y] || { z: 0, t: 0, st: 0, bz: 0, pay: 0, end: 0 };
+      o.z += r.interest || 0; o.t += r.principal > 0 ? r.principal : 0; o.st += r.st || 0; o.bz += r.bz || 0; o.pay += (r.pay || 0); o.end = r.balance; });
+    const ys = Object.keys(years).sort();
+    if (!ui.h10Year || !years[ui.h10Year]) ui.h10Year = years[t.slice(0, 4)] ? t.slice(0, 4) : ys[0];
+    const rb = replacedBy(l);
+    h += `<section class="panel"><h2>Jahresübersicht</h2><p class="muted" style="margin-top:4px">Tippe auf ein Jahr, um seine Monate zu bearbeiten.${l.plan.source ? ' Quelle: ' + esc(l.plan.source) + '.' : ''}</p>
+      <div class="tbl-wrap"><table class="tbl click"><thead><tr><th>Jahr</th><th class="r">Zinsen</th><th class="r">Tilgung</th><th class="r">Sondertilgung</th><th class="r">Bereitst.-Zinsen</th><th class="r">Raten</th><th class="r">Restschuld Ende</th></tr></thead><tbody>
+      ${ys.map(y => { const o = years[y], over = l.stPerYear && o.st > l.stPerYear + 0.005, gone = rb && y > rb.allotDate.slice(0, 4);
+        return `<tr class="${y === ui.h10Year ? 'sel' : ''}${gone ? ' gone' : ''}" data-act="plan-year" data-y="${y}"><td>${y}</td><td class="r">${eur.format(o.z)}</td><td class="r">${eur.format(o.t)}</td>
+        <td class="r${over ? ' neg' : ''}">${o.st ? eur.format(o.st) : '–'}${l.stPerYear ? ` <span class="muted">/ ${eur.format(l.stPerYear)}</span>` : ''}</td><td class="r">${o.bz ? eur.format(o.bz) : '–'}</td><td class="r">${eur.format(o.pay)}</td><td class="r">${eur.format(o.end)}</td></tr>`; }).join('')}
+      </tbody></table></div>${rb ? `<p class="muted">Ab ${fmtD(rb.allotDate)} wird der Kredit durch ${esc(rb.name || 'den Bausparer')} abgelöst. Spätere Jahre sind ausgegraut.</p>` : ''}</section>`;
+    // Monate des gewählten Jahres
+    const idx = l.plan.rows.map((r, i) => i).filter(i => (l.plan.rows[i].d || '').slice(0, 4) === ui.h10Year);
+    h += `<section class="panel" style="margin-top:16px"><div class="panel-head"><h2>Monate ${ui.h10Year}</h2>
+      <div class="row" style="margin:0"><button class="btn icon" data-act="plan-ystep" data-n="-1" aria-label="Voriges Jahr">‹</button><button class="btn icon" data-act="plan-ystep" data-n="1" aria-label="Nächstes Jahr">›</button></div></div>
+      <div class="tbl-wrap"><table class="tbl plan"><thead><tr><th>Datum</th><th>Art</th><th class="r">Zinsen</th><th class="r">Tilgung</th><th class="r">Sondertilgung</th><th class="r">Bereitst.-Zinsen</th><th class="r">Kosten</th><th class="r">Zahlbetrag</th><th class="r">Restschuld</th><th>Notiz</th></tr></thead><tbody>
+      ${idx.map(i => { const r = l.plan.rows[i], c = plan[i];
+        if (r.kind === 'draw') return `<tr><td>${fmtD(r.d)}</td><td>Auszahlung</td><td colspan="6" class="r"><input class="pin" data-plan="${i}" data-f="draw" value="${num2(r.draw)}" inputmode="decimal" aria-label="Auszahlungsbetrag"></td><td class="r">${eur.format(c.balance)}</td><td></td></tr>`;
+        return `<tr class="${c.free ? 'free' : ''}${c.done ? ' gone' : ''}"><td>${fmtD(r.d)}</td><td>${esc(r.label || (c.free ? 'tilgungsfrei' : 'Tilgung'))}</td><td class="r">${eur.format(c.interest)}</td><td class="r">${eur.format(c.principal > 0 ? c.principal : 0)}</td>
+          <td class="r"><input class="pin" data-plan="${i}" data-f="st" value="${r.st ? num2(r.st) : ''}" placeholder="0" inputmode="decimal" aria-label="Sondertilgung ${fmtD(r.d)}"></td>
+          <td class="r"><input class="pin" data-plan="${i}" data-f="bz" value="${r.bz === null || r.bz === undefined || r.bz === '' ? '' : num2(r.bz)}" placeholder="${c.bz ? num2(c.bz) : '0'}" inputmode="decimal" aria-label="Bereitstellungszinsen ${fmtD(r.d)}" title="Leer lassen = automatisch aus den Kopfdaten"></td>
+          <td class="r">${c.cost ? eur.format(c.cost) : '–'}</td>
+          <td class="r"><input class="pin" data-plan="${i}" data-f="pay" value="${r.pay ? num2(r.pay) : ''}" placeholder="0" inputmode="decimal" aria-label="Zahlbetrag ${fmtD(r.d)}"></td>
+          <td class="r">${eur.format(c.balance)}</td><td><input class="pin note" data-plan="${i}" data-f="note" value="${esc(r.note || '')}" aria-label="Notiz ${fmtD(r.d)}"></td></tr>`; }).join('')}
+      </tbody></table></div><p class="muted">Sondertilgung, Bereitstellungszinsen, Zahlbetrag und Notiz sind bearbeitbar. Nach jeder Änderung werden Zinsen, Tilgung und Restschuld für alle folgenden Monate neu berechnet. Bereitstellungszinsen leer lassen = automatisch aus Kopfdaten.</p></section>`;
+    return h;
+  }
+  const b = H.bausparer.find(x => x.id === det.id);
+  if (!b) { ui.h10Detail = null; return renderLoanList(); }
+  const c = calcBsp(b), target = H.loans.find(l => l.id === b.replacesLoanId);
+  h += `<section class="panel"><div class="panel-head"><h2>${esc(b.name || 'Bausparer')}${b.institute ? ' <span class="muted">' + esc(b.institute) + '</span>' : ''}</h2>
+    <div class="row" style="margin:0"><button class="btn small" data-act="xls-bsp" data-id="${esc(b.id)}">Werte aus Excel übernehmen</button><button class="btn small" data-act="bsp-edit" data-id="${esc(b.id)}">Kopfdaten bearbeiten</button></div></div>
+    <div class="kv kv-wide">${[
+      ['Bausparsumme', eur.format(b.sum)], ['Vertragsbeginn', fmtD(b.start) || '–'], ['Abschlussgebühr', b.fee ? eur.format(b.fee) : '–'],
+      ['Sparbeitrag', b.saving ? `${eur.format(b.saving)} ab ${fmtD(b.savingFrom)}` : '–'], ['Guthabenzins', b.savingRate.toLocaleString('de-DE') + ' %'],
+      ['Mindestguthaben', c.minNeed ? `${eur.format(c.minNeed)} (${b.minPct.toLocaleString('de-DE')} %)` : '–'],
+      ['Zuteilung geplant', fmtD(b.allotDate) || '–'], ['Guthaben bei Zuteilung', eur.format(c.guthaben) + (b.allotBalance !== '' ? ' (laut Vertrag)' : ' (berechnet)')],
+      ['Bauspardarlehen', c.loanAmt ? eur.format(c.loanAmt) : '–'], ['Darlehenszins', b.loanRate ? b.loanRate.toLocaleString('de-DE') + ' %' : '–'],
+      ['Rate Darlehen', b.loanPayment ? eur.format(b.loanPayment) : '–'], ['Darlehen getilgt', fmtD(c.loanEnd) || '–'],
+      ['Löst ab', target ? `${target.name || 'Kredit'} (Restschuld am ${fmtD(b.allotDate)}: ${eur.format(loanBalanceAt({ ...target }, b.allotDate))})` : '–']
+    ].map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></section>`;
+  const years = {};
+  c.rows.forEach(r => { const y = r.ym.slice(0, 4), o = years[y] = years[y] || { save: 0, zs: 0, g: null, pay: 0, zl: 0, rest: null };
+    if (r.phase === 'spar') { o.save += r.pay; o.zs += r.interest; o.g = r.balance; } else { o.pay += r.pay; o.zl += r.interest; o.rest = r.balance; } });
+  h += `<section class="panel" style="margin-top:16px"><h2>Verlauf</h2><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Jahr</th><th class="r">Sparbeiträge</th><th class="r">Guthabenzinsen</th><th class="r">Guthaben Ende</th><th class="r">Darlehensraten</th><th class="r">Darlehenszinsen</th><th class="r">Restschuld Ende</th></tr></thead><tbody>
+    ${Object.keys(years).sort().map(y => { const o = years[y]; return `<tr${y === t.slice(0, 4) ? ' class="sel"' : ''}><td>${y}</td><td class="r">${o.save ? eur.format(o.save) : '–'}</td><td class="r">${o.zs ? eur.format(o.zs) : '–'}</td><td class="r">${o.g !== null ? eur.format(o.g) : '–'}</td>
+      <td class="r">${o.pay ? eur.format(o.pay) : '–'}</td><td class="r">${o.zl ? eur.format(o.zl) : '–'}</td><td class="r">${o.rest !== null ? eur.format(o.rest) : '–'}</td></tr>`; }).join('')}
+    </tbody></table></div><p class="muted">Guthabenzinsen monatlich auf das positive Guthaben gerechnet. Ist ein „Guthaben bei Zuteilung laut Vertrag“ eingetragen, gilt dieser Wert für das Bauspardarlehen.</p></section>`;
+  return h;
+}
 function editLoan(id) {
   const l = id ? data.h10.loans.find(x => x.id === id) : null;
   if (id && !l) return;
+  const n2 = v => v ? num2(v) : '';
+  const pc = v => v ? String(Math.round(v * 1e6) / 1e6).replace('.', ',') : '';
   openDialog({
-    title: l ? 'Kredit bearbeiten' : 'Neuer Kredit',
+    title: l ? 'Kopfdaten des Kredits' : 'Neuer Kredit',
     fields: [
       { name: 'name', label: 'Bezeichnung', value: l ? l.name : '', required: true, half: true },
       { name: 'bank', label: 'Bank', value: l ? l.bank : '', list: 'firmList', half: true },
-      { name: 'amount', label: 'Darlehensbetrag in €', value: l ? num2(l.amount) : '', required: true, inputmode: 'decimal', half: true },
-      { name: 'drawn', label: 'Davon abgerufen (optional)', value: l && l.drawn !== '' ? num2(l.drawn) : '', inputmode: 'decimal', half: true },
-      { name: 'rate', label: 'Sollzins in %', value: l ? String(l.rate).replace('.', ',') : '', inputmode: 'decimal', half: true },
-      { name: 'payment', label: 'Monatliche Rate in €', value: l && l.payment ? num2(l.payment) : '', inputmode: 'decimal', half: true },
+      { name: 'amount', label: 'Darlehenssumme in €', value: l ? num2(l.amount) : '', required: true, inputmode: 'decimal', half: true },
+      { name: 'payoutDate', label: 'Auszahlungstermin', type: 'date', value: l ? l.payoutDate : '', half: true },
+      { name: 'rate', label: 'Sollzins in %', value: l ? pc(l.rate) : '', inputmode: 'decimal', half: true },
+      { name: 'effRate', label: 'Effektivzins in %', value: l ? pc(l.effRate) : '', inputmode: 'decimal', half: true },
+      { name: 'payment', label: 'Monatliche Rate in €', value: l ? n2(l.payment) : '', inputmode: 'decimal', half: true },
       { name: 'firstPay', label: 'Erste Rate am', type: 'date', value: l ? l.firstPay : '', half: true },
       { name: 'fixedUntil', label: 'Zinsbindung bis', type: 'date', value: l ? l.fixedUntil : '', half: true },
-      { name: 'extra', label: 'Sondertilgungen bisher in €', value: l && l.extra ? num2(l.extra) : '', inputmode: 'decimal' },
+      { name: 'followRate', label: 'Anschlusszins in % (Annahme)', value: l ? pc(l.followRate) : '', inputmode: 'decimal', half: true, hint: 'Leer = Sollzins gilt weiter.' },
+      { name: 'stPerYear', label: 'Mögliche Sondertilgung pro Jahr in €', value: l ? n2(l.stPerYear) : '', inputmode: 'decimal', half: true },
+      { name: 'drawn', label: 'Davon abgerufen in € (optional)', value: l && l.drawn !== '' ? num2(l.drawn) : '', inputmode: 'decimal', half: true },
+      { name: 'bzRate', label: 'Bereitstellungszins in % pro Monat', value: l ? pc(l.bzRate) : '', inputmode: 'decimal', half: true, hint: 'z. B. 0,15' },
+      { name: 'bzFrom', label: 'Bereitstellungszins ab', type: 'date', value: l ? l.bzFrom : '', half: true },
+      { name: 'fees', label: 'Abschlussgebühren in €', value: l ? n2(l.fees) : '', inputmode: 'decimal', half: true },
+      { name: 'oneTime', label: 'Einmalkosten in €', value: l ? n2(l.oneTime) : '', inputmode: 'decimal', half: true },
+      { name: 'payInterestFree', label: 'In tilgungsfreien Monaten werden die Zinsen monatlich abgebucht', type: 'checkbox', value: l ? l.payInterestFree : false },
       { name: 'url', label: 'Link zum Vertrag (optional)', value: l ? l.url : '', inputmode: 'url', hint: 'z. B. ein Link auf die Datei in Google Drive' },
       { name: 'note', label: 'Notiz', type: 'textarea', value: l ? l.note : '' }],
     onSave: v => {
       const amount = parseAmount(v.amount);
-      if (!(amount > 0)) { toast('Bitte den Darlehensbetrag angeben.'); return false; }
+      if (!(amount > 0)) { toast('Bitte die Darlehenssumme angeben.'); return false; }
       const num = x => { const n = parseAmount(x); return isFinite(n) ? n : 0; };
-      const rec = { name: v.name.trim(), bank: v.bank.trim(), amount, drawn: v.drawn.trim() ? num(v.drawn) : '', rate: num(v.rate), payment: num(v.payment),
-                    firstPay: v.firstPay || '', fixedUntil: v.fixedUntil || '', extra: num(v.extra), url: v.url.trim(), note: (v.note || '').trim() };
-      if (l) Object.assign(l, rec); else data.h10.loans.push({ id: uid(), ...rec });
+      const rec = { name: v.name.trim(), bank: v.bank.trim(), amount, drawn: v.drawn.trim() ? num(v.drawn) : '', rate: num(v.rate), effRate: num(v.effRate), payment: num(v.payment),
+                    payoutDate: v.payoutDate || '', firstPay: v.firstPay || '', fixedUntil: v.fixedUntil || '', followRate: num(v.followRate), stPerYear: num(v.stPerYear),
+                    bzRate: num(v.bzRate), bzFrom: v.bzFrom || '', fees: num(v.fees), oneTime: num(v.oneTime), payInterestFree: !!v.payInterestFree,
+                    url: v.url.trim(), note: (v.note || '').trim() };
+      if (l) Object.assign(l, rec); else { const nl = { id: uid(), extra: 0, plan: null, ...rec }; data.h10.loans.push(nl); ui.h10Detail = { kind: 'loan', id: nl.id }; }
       commit();
     },
-    onDelete: l ? () => { data.h10.loans = data.h10.loans.filter(x => x !== l); commit(); } : null
+    onDelete: l ? () => { data.h10.loans = data.h10.loans.filter(x => x !== l); data.h10.bausparer.forEach(b => { if (b.replacesLoanId === l.id) b.replacesLoanId = ''; }); ui.h10Detail = null; commit(); } : null
   });
   if (l && l.url) addLinkButton(l.url);
+}
+function editBsp(id, pre) {
+  const b0 = id ? data.h10.bausparer.find(x => x.id === id) : null;
+  if (id && !b0) return;
+  const b = { ...(b0 || { name: '', institute: '', sum: 0, start: '', fee: 0, feeFromBalance: true, saving: 0, savingFrom: '', savingRate: 0, minPct: 0, allotDate: '', bonus: 0,
+              allotBalance: '', loanAmount: '', loanRate: 0, loanPayment: 0, replacesLoanId: '', anchorAmount: '', anchorDate: '', url: '', note: '' }), ...(pre || {}) };
+  const n2 = v => v === '' || v === null || v === undefined || v === 0 ? '' : num2(v);
+  const pc = v => v ? String(Math.round(v * 1e6) / 1e6).replace('.', ',') : '';
+  openDialog({
+    title: b0 ? 'Bausparer bearbeiten' : 'Neuer Bausparer',
+    fields: [
+      { name: 'name', label: 'Bezeichnung / Tarif', value: b.name, required: true, half: true },
+      { name: 'institute', label: 'Bausparkasse', value: b.institute, list: 'firmList', half: true },
+      { name: 'sum', label: 'Bausparsumme in €', value: n2(b.sum), required: true, inputmode: 'decimal', half: true },
+      { name: 'start', label: 'Vertragsbeginn', type: 'date', value: b.start, half: true },
+      { name: 'fee', label: 'Abschlussgebühr in €', value: n2(b.fee), inputmode: 'decimal', half: true },
+      { name: 'feeFromBalance', label: 'Gebühr wird mit dem Guthaben verrechnet', type: 'checkbox', value: b.feeFromBalance },
+      { name: 'saving', label: 'Sparbeitrag pro Monat in €', value: n2(b.saving), inputmode: 'decimal', half: true },
+      { name: 'savingFrom', label: 'Sparbeitrag ab', type: 'date', value: b.savingFrom, half: true },
+      { name: 'savingRate', label: 'Guthabenzins in % p. a.', value: pc(b.savingRate), inputmode: 'decimal', half: true },
+      { name: 'minPct', label: 'Mindestsparguthaben in % der Summe', value: pc(b.minPct), inputmode: 'decimal', half: true },
+      { name: 'allotDate', label: 'Zuteilung / Ablöse geplant am', type: 'date', value: b.allotDate, half: true },
+      { name: 'bonus', label: 'Prämien bis Zuteilung in € (z. B. Wohnungsbauprämie)', value: n2(b.bonus), inputmode: 'decimal', half: true },
+      { name: 'allotBalance', label: 'Guthaben bei Zuteilung laut Vertrag (optional)', value: n2(b.allotBalance), inputmode: 'decimal', half: true, hint: 'Leer = wird berechnet.' },
+      { name: 'loanAmount', label: 'Bauspardarlehen laut Vertrag (optional)', value: n2(b.loanAmount), inputmode: 'decimal', half: true, hint: 'Leer = Summe minus Guthaben.' },
+      { name: 'loanRate', label: 'Darlehenszins in %', value: pc(b.loanRate), inputmode: 'decimal', half: true },
+      { name: 'loanPayment', label: 'Rate Bauspardarlehen pro Monat in €', value: n2(b.loanPayment), inputmode: 'decimal', half: true },
+      { name: 'replacesLoanId', label: 'Löst diesen Kredit ab', type: 'select', value: b.replacesLoanId,
+        options: [{ value: '', label: 'Keinen' }, ...data.h10.loans.map(l => ({ value: l.id, label: l.name || l.bank || 'Kredit' }))] },
+      { name: 'anchorAmount', label: 'Guthaben laut Kontoauszug (optional)', value: n2(b.anchorAmount), inputmode: 'decimal', half: true },
+      { name: 'anchorDate', label: 'Stand vom', type: 'date', value: b.anchorDate, half: true },
+      { name: 'url', label: 'Link zum Vertrag (optional)', value: b.url, inputmode: 'url' },
+      { name: 'note', label: 'Notiz', type: 'textarea', value: b.note }],
+    onSave: v => {
+      const sum = parseAmount(v.sum);
+      if (!(sum > 0)) { toast('Bitte die Bausparsumme angeben.'); return false; }
+      const num = x => { const n = parseAmount(x); return isFinite(n) ? n : 0; };
+      const opt = x => (x || '').trim() ? num(x) : '';
+      const rec = { name: v.name.trim(), institute: v.institute.trim(), sum, start: v.start || '', fee: num(v.fee), feeFromBalance: !!v.feeFromBalance, saving: num(v.saving),
+                    savingFrom: v.savingFrom || '', savingRate: num(v.savingRate), minPct: num(v.minPct), allotDate: v.allotDate || '', bonus: num(v.bonus),
+                    allotBalance: opt(v.allotBalance), loanAmount: opt(v.loanAmount), loanRate: num(v.loanRate), loanPayment: num(v.loanPayment),
+                    replacesLoanId: v.replacesLoanId || '', anchorAmount: opt(v.anchorAmount), anchorDate: v.anchorDate || '', url: v.url.trim(), note: (v.note || '').trim() };
+      if (rec.anchorAmount !== '' && !rec.anchorDate) { toast('Bitte zum Guthaben laut Kontoauszug auch das Datum angeben.'); return false; }
+      if (b0) Object.assign(b0, rec); else { const nb = { id: uid(), ...rec }; data.h10.bausparer.push(nb); ui.h10Detail = { kind: 'bsp', id: nb.id }; }
+      commit();
+    },
+    onDelete: b0 ? () => { data.h10.bausparer = data.h10.bausparer.filter(x => x !== b0); ui.h10Detail = null; commit(); } : null
+  });
+  if (b0 && b0.url) addLinkButton(b0.url);
 }
 function editInvoice(id, offerId) {
   const i = id ? data.h10.invoices.find(x => x.id === id) : null;
@@ -2581,10 +3128,48 @@ document.addEventListener('click', async e => {
     case 'ff-toggle': ui.ffOpen = !ui.ffOpen; if (ui.ffOpen) { meta.fold = meta.fold || {}; meta.fold.list = true; saveMeta(); renderFolds(); } renderFilter(); if (ui.ffOpen) $('#ffCat').focus(); break;
     case 'fb-toggle': ui.fbOpen = !ui.fbOpen; if (ui.fbOpen) { meta.fold = meta.fold || {}; meta.fold.list = true; saveMeta(); } renderFin(); if (ui.fbOpen) $('#finForm [name=desc]').focus(); break;
     case 'fold': { const open = foldOpen(d.k); meta.fold[d.k] = !open; saveMeta(); renderFolds(); break; }
-    case 'h10-tab': ui.h10Tab = d.tab; meta.h10Tab = d.tab; saveMeta(); renderH10(); break;
+    case 'h10-tab': ui.h10Detail = null; ui.h10Tab = d.tab; meta.h10Tab = d.tab; saveMeta(); renderH10(); break;
     case 'h10-inv': ui.h10Inv = d.f; renderH10(); break;
     case 'loan-new': editLoan(null); break;
     case 'loan-edit': editLoan(d.id); break;
+    case 'loan-open': ui.h10Detail = { kind: 'loan', id: d.id }; ui.h10Year = ''; renderH10(); window.scrollTo(0, 0); break;
+    case 'bsp-open': ui.h10Detail = { kind: 'bsp', id: d.id }; renderH10(); window.scrollTo(0, 0); break;
+    case 'loan-back': ui.h10Detail = null; renderH10(); window.scrollTo(0, 0); break;
+    case 'bsp-new': editBsp(null); break;
+    case 'bsp-edit': editBsp(d.id); break;
+    case 'xls-loan': openXls('loan', d.id); break;
+    case 'xls-bsp': openXls('bsp', d.id); break;
+    case 'plan-year': ui.h10Year = d.y; renderH10(); break;
+    case 'plan-ystep': ui.h10Year = String(+ui.h10Year + +d.n); renderH10(); break;
+    case 'plan-build': { const l = data.h10.loans.find(x => x.id === d.id); if (!l) break;
+      if (hasPlan(l) && !confirm('Den vorhandenen Tilgungsplan durch einen aus den Kopfdaten berechneten ersetzen?')) break;
+      if (buildPlan(l)) { commit(); toast('Tilgungsplan berechnet'); } break; }
+    case 'draw-add': {
+      const l = data.h10.loans.find(x => x.id === d.id); if (!l) break;
+      openDialog({ title: 'Auszahlung erfassen', fields: [
+        { name: 'date', label: 'Datum', type: 'date', value: todayStr(), required: true, half: true },
+        { name: 'amount', label: 'Betrag in €', value: num2(availableAt(l, '9999-12-31')), required: true, inputmode: 'decimal', half: true },
+        { name: 'label', label: 'Bezeichnung (optional)', value: '', hint: 'z. B. „2. Teilauszahlung Rohbau“' }],
+        onSave: v => {
+          const amt = parseAmount(v.amount);
+          if (!(amt > 0)) { toast('Bitte einen Betrag größer als 0 eingeben.'); return false; }
+          if (drawnAt(l, '9999-12-31') + amt > l.amount + 0.005 && !confirm('Damit wird mehr ausgezahlt als die Darlehenssumme. Trotzdem speichern?')) return false;
+          const row = { kind: 'draw', d: v.date, label: v.label.trim() || 'Auszahlung', draw: amt };
+          if (hasPlan(l)) {
+            const at = l.plan.rows.findIndex(r => (r.d || '') > v.date);
+            l.plan.rows.splice(at < 0 ? l.plan.rows.length : at, 0, row);
+            extendPlan(l);
+          } else l.drawn = Math.min(l.amount, (l.drawn === '' ? 0 : l.drawn) + amt);
+          commit();
+        } });
+      break;
+    }
+    case 'draw-del': {
+      const l = data.h10.loans.find(x => x.id === d.id); const r = l && l.plan && l.plan.rows[+d.i];
+      if (r && r.draw && confirm(`Auszahlung über ${eur.format(r.draw)} löschen? Der Plan wird neu berechnet.`)) { l.plan.rows.splice(+d.i, 1); commit(); }
+      break;
+    }
+    case 'plan-del': { const l = data.h10.loans.find(x => x.id === d.id); if (l && confirm('Tilgungsplan dieses Kredits entfernen? Die Kopfdaten bleiben erhalten.')) { l.plan = null; commit(); } break; }
     case 'inv-new': editInvoice(null, d.offer || ''); break;
     case 'inv-edit': editInvoice(d.id); break;
     case 'offer-new': editOffer(null, d.trade || ''); break;
@@ -2625,6 +3210,17 @@ document.addEventListener('change', e => {
     if (c) { c.on = e.target.checked; commit(); if (c.on) refreshCalendars(false); }
     return;
   }
+  if (ds.plan !== undefined) {
+    const det = ui.h10Detail, l = det && data.h10.loans.find(x => x.id === det.id);
+    const r = l && l.plan && l.plan.rows[+ds.plan];
+    if (!r) return;
+    const raw = e.target.value.trim();
+    if (ds.f === 'note') r.note = raw;
+    else if (ds.f === 'bz') r.bz = raw === '' ? null : (isFinite(parseAmount(raw)) ? parseAmount(raw) : null);
+    else { const n = parseAmount(raw); r[ds.f] = raw === '' ? 0 : isFinite(n) ? n : r[ds.f]; }
+    commit();
+    return;
+  }
   if (ds.gcalList !== undefined) {
     const c = data.settings.gcals[+ds.gcalList];
     if (c) { c.listed = e.target.checked; if (c.listed) c.on = true; commit(); if (c.listed) refreshCalendars(false); }
@@ -2649,6 +3245,11 @@ document.addEventListener('change', e => {
   }
 });
 
+$('#xlsInput').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) onXlsFile(f);
+  e.target.value = '';
+});
 $('#importInput').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0];
   if (f) importFile(f);
