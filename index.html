@@ -410,6 +410,31 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
 .pin:placeholder-shown{color:var(--muted)}
 .loan.bsp{border-left:4px solid var(--event)}
 
+/* Dateien und Großansicht */
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.file-card{display:flex;flex-direction:column;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:0;overflow:hidden;cursor:pointer;font:inherit;color:inherit}
+.file-card:hover{border-color:var(--accent)}
+.file-thumb{position:relative;aspect-ratio:4/3;background:var(--surface-2);display:grid;place-items:center;overflow:hidden}
+.file-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.file-icon{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em;padding:6px 10px;border:2px solid var(--line);border-radius:6px;background:var(--surface)}
+.file-icon.big{font-size:20px;padding:18px 24px}
+.file-name{padding:8px 10px 0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-meta{padding:2px 10px 9px;font-size:12px;color:var(--muted)}
+.viewer{width:min(1200px,calc(100vw - 24px));height:calc(100vh - 24px);max-height:none;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.viewer:not([open]){display:none}
+.viewer-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+.viewer-title{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.viewer-body{flex:1;min-height:0;display:grid;place-items:center;background:var(--surface-2);overflow:auto}
+.viewer-img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.viewer-frame{width:100%;height:100%;border:0;background:#fff}
+.viewer-pdf{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px;text-align:center}
+.viewer-pdf img{max-width:min(420px,90%);border:1px solid var(--line);border-radius:6px}
+.att-list{display:flex;flex-direction:column;gap:4px}
+.att-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)}
+.att-open{text-align:left;font-size:14px;overflow-wrap:anywhere}
+#h10Tabs{overflow-x:auto;max-width:100%}
+@media (max-width:640px){ .file-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .viewer{width:100vw;height:100vh;max-width:none;border-radius:0} }
+
 </style>
 </head>
 <body>
@@ -601,6 +626,7 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
             <button type="button" data-act="h10-tab" data-tab="kredite">Kredite</button>
             <button type="button" data-act="h10-tab" data-tab="rechnungen">Rechnungen</button>
             <button type="button" data-act="h10-tab" data-tab="angebote">Angebote</button>
+            <button type="button" data-act="h10-tab" data-tab="dateien">Dateien</button>
           </div>
         </div>
         <div class="fin-sum h10-sum" id="h10Sum"></div>
@@ -631,6 +657,20 @@ dialog.wide{width:min(900px,calc(100vw - 24px))}
   </div>
 </div>
 
+<dialog id="viewer" class="viewer">
+  <div class="viewer-head">
+    <span class="viewer-title" id="viewerTitle"></span>
+    <span class="row" style="margin:0">
+      <button type="button" class="btn small" id="viewerPrev" aria-label="Vorherige Datei">‹</button>
+      <button type="button" class="btn small" id="viewerNext" aria-label="Nächste Datei">›</button>
+      <button type="button" class="btn small" id="viewerEdit">Bearbeiten</button>
+      <button type="button" class="btn small" id="viewerDrive">In Drive öffnen</button>
+      <button type="button" class="btn small primary" id="viewerClose">Schließen</button>
+    </span>
+  </div>
+  <div class="viewer-body" id="viewerBody"></div>
+</dialog>
+<input type="file" id="h10FileInput" accept="image/*,application/pdf" multiple hidden>
 <dialog id="dlg">
   <form id="dlgForm" autocomplete="off">
     <h2 id="dlgTitle"></h2>
@@ -741,7 +781,7 @@ function parseAmount(s) {
 /* ---------- Daten ---------- */
 function emptyData() {
   return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
-           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [], h10: { loans: [], invoices: [], offers: [], bausparer: [] },
+           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [], h10: { loans: [], invoices: [], offers: [], bausparer: [], files: [] },
            settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS],
                        catRules: { ...DEFAULT_RULES }, fixedIgnore: [] } };
 }
@@ -772,6 +812,7 @@ function normalize(d) {
     startDate: x.startDate || '', endDate: x.endDate || '', lastDate: x.lastDate || '', auto: !!x.auto, created: x.created || '' }));
   const h = d.h10 && typeof d.h10 === 'object' ? d.h10 : {};
   const arr = v => Array.isArray(v) ? v.filter(x => x && x.id) : [];
+  const attList = v => arr(v).map(f => ({ id: f.id, name: f.name || 'Datei', mime: f.mime || '' }));
   const h10 = {
     loans: arr(h.loans).map(x => ({ id: x.id, bank: x.bank || '', name: x.name || '', amount: Number(x.amount) || 0, drawn: x.drawn === '' || x.drawn == null ? '' : Number(x.drawn) || 0,
       rate: Number(x.rate) || 0, payment: Number(x.payment) || 0, firstPay: x.firstPay || '', fixedUntil: x.fixedUntil || '', extra: Number(x.extra) || 0, note: x.note || '', url: x.url || '',
@@ -785,9 +826,11 @@ function normalize(d) {
       replacesLoanId: x.replacesLoanId || '', anchorAmount: x.anchorAmount === '' || x.anchorAmount == null ? '' : Number(x.anchorAmount) || 0, anchorDate: x.anchorDate || '',
       url: x.url || '', note: x.note || '' })),
     invoices: arr(h.invoices).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', number: x.number || '', date: x.date || '',
-      amount: Number(x.amount) || 0, due: x.due || '', paid: !!x.paid, paidDate: x.paidDate || '', offerId: x.offerId || '', url: x.url || '', note: x.note || '' })),
+      amount: Number(x.amount) || 0, due: x.due || '', paid: !!x.paid, paidDate: x.paidDate || '', offerId: x.offerId || '', url: x.url || '', note: x.note || '', files: attList(x.files) })),
     offers: arr(h.offers).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', date: x.date || '', amount: Number(x.amount) || 0,
-      validUntil: x.validUntil || '', status: ['offen', 'angenommen', 'abgelehnt'].includes(x.status) ? x.status : 'offen', url: x.url || '', note: x.note || '' }))
+      validUntil: x.validUntil || '', status: ['offen', 'angenommen', 'abgelehnt'].includes(x.status) ? x.status : 'offen', url: x.url || '', note: x.note || '', files: attList(x.files) })),
+    files: arr(h.files).map(x => ({ id: x.id, name: x.name || 'Datei', title: x.title || '', mime: x.mime || '', size: Number(x.size) || 0,
+      cat: ['Pläne', 'Fotos', 'Dokumente', 'Sonstiges'].includes(x.cat) ? x.cat : 'Sonstiges', created: x.created || '', note: x.note || '' }))
   };
   return { app: 'dashboard', version: 2, updatedAt: d.updatedAt || null,
            todos: Array.isArray(d.todos) ? d.todos : [],
@@ -806,7 +849,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { h10Detail: null, h10Year: '', fbOpen: false, h10Tab: meta.h10Tab || 'kredite', h10Inv: 'alle', ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { h10FileCat: 'Alle', h10Detail: null, h10Year: '', fbOpen: false, h10Tab: meta.h10Tab || 'kredite', h10Inv: 'alle', ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -817,6 +860,22 @@ function commit() {
   scheduleSync();
   render();
 }
+/* Ein anderer Tab bzw. die installierte App hat gespeichert */
+let pendingLocal = null;
+window.addEventListener('storage', e => {
+  if (e.key === LS_META && e.newValue) { try { const m = JSON.parse(e.newValue); meta = { ...m, view: meta.view }; } catch {} return; }
+  if (e.key !== LS_DATA || !e.newValue) return;
+  let d; try { d = normalize(JSON.parse(e.newValue)); } catch { return; }
+  if ((d.updatedAt || '') <= (data.updatedAt || '')) return;
+  if (userBusy()) { pendingLocal = d; return; }
+  data = d; render();
+});
+function applyPendingLocal() {
+  if (pendingLocal && !userBusy() && (pendingLocal.updatedAt || '') > (data.updatedAt || '')) { data = pendingLocal; render(); }
+  pendingLocal = null;
+  if (sync.pendingRemote && signedIn()) { sync.pendingRemote = false; syncData(); }
+}
+document.addEventListener('focusout', () => setTimeout(applyPendingLocal, 150));
 function replaceData(d) {
   data = normalize(d);
   saveLocal();
@@ -926,17 +985,20 @@ async function driveDownload(id) {
   return (await api(`${DRIVE_API}/files/${id}?alt=media`)).json();
 }
 async function driveUpload() {
-  const info = { mimeType: 'application/json', appProperties: { updatedAt: data.updatedAt || '' } };
+  const ver = data.updatedAt || '', snapshot = JSON.stringify(data);    // Stand beim Start festhalten
+  const info = { mimeType: 'application/json', appProperties: { updatedAt: ver } };
   let url, method;
   if (meta.fileId) { url = `${UPLOAD_API}/files/${meta.fileId}?uploadType=multipart&fields=id`; method = 'PATCH'; }
   else { info.name = DRIVE_FILE; info.parents = [await driveFolder()]; url = `${UPLOAD_API}/files?uploadType=multipart&fields=id`; method = 'POST'; }
   const b = 'dashboard' + Math.random().toString(36).slice(2);
   const body = `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(info)}\r\n` +
-               `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(data)}\r\n--${b}--`;
+               `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${snapshot}\r\n--${b}--`;
   const j = await (await api(url, { method, headers: { 'Content-Type': `multipart/related; boundary=${b}` }, body })).json();
   meta.fileId = j.id;
-  meta.baseRemote = data.updatedAt || '';
-  meta.dirty = false;
+  meta.baseRemote = ver;
+  saveBase(snapshot);
+  meta.dirty = (data.updatedAt || '') !== ver;      // während des Hochladens weiter bearbeitet? Dann gleich nochmal
+  if (meta.dirty) sync.again = true;
   meta.lastSync = new Date().toISOString();
   saveMeta();
 }
@@ -948,6 +1010,42 @@ function scheduleSync() {
   if (signedIn()) sync.timer = setTimeout(syncData, 1500);
 }
 /* Abgleich: neuere Seite gewinnt; wurde auf beiden Seiten geändert, wird nachgefragt */
+/* Wird gerade etwas eingegeben? Dann wird kein Stand von außen eingespielt */
+function userBusy() {
+  const ae = document.activeElement;
+  if ($('#dlg').open || ($('#impDlg') && $('#impDlg').open)) return true;
+  // ein Eingabefeld mit Inhalt hat den Fokus: der Nutzer tippt vermutlich gerade
+  return !!(ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && !/^(checkbox|radio|button|file)$/.test(ae.type) && ae.value !== '' && ae.closest('main'));
+}
+let deferTimer = null;
+function deferSync(ms) { clearTimeout(deferTimer); deferTimer = setTimeout(() => { if (signedIn()) syncData(); }, ms || 4000); }
+/* Drei-Wege-Abgleich: letzter gemeinsamer Stand, dieses Gerät, Drive. Änderungen beider Seiten bleiben erhalten. */
+const MERGE_LISTS = ['todos', 'events', 'finance', 'fixed', 'accounts', 'h10.loans', 'h10.invoices', 'h10.offers', 'h10.bausparer', 'h10.files'];
+function merge3(base, local, remote, trustRemote) {
+  const get = (o, p) => p.split('.').reduce((x, k) => x && x[k], o);
+  const out = JSON.parse(JSON.stringify(local));
+  for (const p of MERGE_LISTS) {
+    const B = new Map((get(base, p) || []).map(x => [x.id, JSON.stringify(x)]));
+    const L = get(local, p) || [], R = get(remote, p) || [];
+    const Lids = new Set(L.map(x => x.id)), Rm = new Map(R.map(x => [x.id, x]));
+    const res = [];
+    for (const x of L) {
+      if (!trustRemote) { res.push(x); continue; }        // Drive-Stand ist älter: hier nichts verwerfen, nur Neues ergänzen
+      const r = Rm.get(x.id), b = B.get(x.id), lj = JSON.stringify(x);
+      if (r) res.push(lj === b ? r : x);                 // hier unverändert → Stand des anderen Geräts, sonst dieser
+      else if (b !== undefined && lj === b) continue;     // auf dem anderen Gerät gelöscht, hier unverändert
+      else res.push(x);
+    }
+    for (const r of R) if (!Lids.has(r.id) && !B.has(r.id)) res.push(r);   // auf dem anderen Gerät neu
+    const ks = p.split('.'); let tgt = out;
+    ks.slice(0, -1).forEach(k => { tgt = tgt[k] = tgt[k] || {}; });
+    tgt[ks[ks.length - 1]] = res;
+  }
+  if (trustRemote && JSON.stringify(local.settings) === JSON.stringify(base.settings)) out.settings = remote.settings;
+  return normalize(out);
+}
+const LS_BASE = 'dashboard.base';
+const saveBase = json => { try { localStorage.setItem(LS_BASE, typeof json === 'string' ? json : JSON.stringify(json)); } catch {} };
 async function syncData() {
   clearTimeout(sync.timer); sync.timer = null;
   if (!signedIn()) { renderStatus(); return; }
@@ -956,27 +1054,51 @@ async function syncData() {
   try {
     const remote = await driveFind();
     const now = new Date().toISOString();
+    const local = data.updatedAt || '';
     if (!remote) {
       if (hasContent(data) || meta.dirty) await driveUpload();
       else { meta.lastSync = now; saveMeta(); }
-    } else if (remote.updatedAt === data.updatedAt) {
+    } else if (remote.updatedAt === local) {
       meta.dirty = false; meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
+      if (!localStorage.getItem(LS_BASE)) saveBase(data);
     } else if (remote.updatedAt === (meta.baseRemote || '')) {
-      if (meta.dirty) await driveUpload();
+      // Drive unverändert seit dem letzten Abgleich: hier Neueres hochladen
+      if (meta.dirty || local > remote.updatedAt) await driveUpload();
       else { meta.lastSync = now; saveMeta(); }
-    } else if (!meta.dirty) {
-      replaceData(await driveDownload(remote.id));
-      meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
-      toast('Neuester Stand aus Google Drive geladen');
+    } else if (!meta.dirty && remote.updatedAt > local) {
+      // nur das andere Gerät hat etwas geändert: übernehmen, aber nie mitten in eine Eingabe hinein
+      if (userBusy()) { sync.pendingRemote = true; deferSync(5000); }
+      else {
+        const d = await driveDownload(remote.id);
+        if ((data.updatedAt || '') !== local || meta.dirty) sync.again = true;
+        else if (userBusy()) { sync.pendingRemote = true; deferSync(5000); }
+        else {
+          replaceData(d); saveBase(d);
+          sync.pendingRemote = false;
+          meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
+          toast('Neuerer Stand von einem anderen Gerät geladen');
+        }
+      }
+    } else if (userBusy()) {
+      sync.pendingRemote = true; deferSync(5000);
     } else {
-      const takeRemote = confirm(
-        `Auf einem anderen Gerät wurde am ${fmtDateTime(remote.updatedAt)} gespeichert, und auf diesem Gerät gibt es noch nicht hochgeladene Änderungen.\n\n` +
-        'OK: Stand aus Google Drive laden (Änderungen auf diesem Gerät verwerfen)\n' +
-        'Abbrechen: Stand dieses Geräts behalten und hochladen (der Drive-Stand bleibt im Versionsverlauf von Google Drive erhalten)');
-      if (takeRemote) {
-        replaceData(await driveDownload(remote.id));
-        meta.dirty = false; meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
-      } else await driveUpload();
+      // beide Seiten haben sich geändert (oder Drive enthält einen älteren Stand): zusammenführen statt überschreiben
+      const d = normalize(await driveDownload(remote.id));
+      if ((data.updatedAt || '') !== local) sync.again = true;
+      else {
+        const base = lsGet(LS_BASE, null);
+        if (base) {
+          data = merge3(normalize(base), data, d, remote.updatedAt > local);
+          data.updatedAt = new Date().toISOString(); saveLocal(); render();
+          await driveUpload();
+          if (remote.updatedAt > local) toast('Änderungen von diesem und einem anderen Gerät wurden zusammengeführt');
+        } else if (remote.updatedAt > local && confirm(
+            `Auf einem anderen Gerät wurde am ${fmtDateTime(remote.updatedAt)} gespeichert, und auf diesem Gerät gibt es noch nicht hochgeladene Änderungen.\n\n` +
+            'OK: Stand aus Google Drive laden (Änderungen auf diesem Gerät verwerfen)\n' +
+            'Abbrechen: Stand dieses Geräts behalten und hochladen (der Drive-Stand bleibt im Versionsverlauf von Google Drive erhalten)')) {
+          replaceData(d); saveBase(d); meta.dirty = false; meta.baseRemote = remote.updatedAt; meta.lastSync = now; saveMeta();
+        } else { data.updatedAt = new Date().toISOString(); saveLocal(); await driveUpload(); }
+      }
     }
     sync.error = null;
   } catch (e) {
@@ -984,7 +1106,7 @@ async function syncData() {
   } finally {
     sync.busy = false;
     renderStatus(); renderSettings();
-    if (sync.again) { sync.again = false; syncData(); }
+    if (sync.again) { sync.again = false; setTimeout(syncData, 300); }
   }
 }
 
@@ -1959,7 +2081,7 @@ function renderH10() {
       const st = invState(i), o = i.offerId ? offerFor(i.offerId) : null;
       const sub = [i.trade, i.number ? 'Nr. ' + i.number : '', i.date ? 'vom ' + fmtD(i.date) : '',
                    i.paid ? (i.paidDate ? 'bezahlt am ' + fmtD(i.paidDate) : 'bezahlt') : i.due ? 'fällig ' + fmtD(i.due) : '', o ? 'zu Angebot ' + (o.firm || o.title) : ''].filter(Boolean).join(', ');
-      return `<button class="fin-row" data-act="inv-edit" data-id="${esc(i.id)}"><span class="t">${esc(i.firm || 'Rechnung')}${i.title ? ' – ' + esc(i.title) : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${st === 'überfällig' ? 'late' : st}">${st}</span><span class="amt">${eur.format(i.amount)}</span></button>`;
+      return `<button class="fin-row" data-act="inv-edit" data-id="${esc(i.id)}"><span class="t">${esc(i.firm || 'Rechnung')}${i.title ? ' – ' + esc(i.title) : ''}${(i.files || []).length ? ` <span class="tag">${i.files.length} ${i.files.length === 1 ? 'Datei' : 'Dateien'}</span>` : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${st === 'überfällig' ? 'late' : st}">${st}</span><span class="amt">${eur.format(i.amount)}</span></button>`;
     }).join('') : '<p class="empty">Keine Rechnungen.</p>'}</div></section>`;
   }
 
@@ -1977,10 +2099,11 @@ function renderH10() {
         const expired = o.status === 'offen' && o.validUntil && o.validUntil < t;
         const sub = [o.title, o.date ? 'vom ' + fmtD(o.date) : '', o.validUntil ? (expired ? 'abgelaufen am ' : 'gültig bis ') + fmtD(o.validUntil) : '',
                      inv ? 'abgerechnet ' + eur.format(inv) : ''].filter(Boolean).join(', ');
-        return `<button class="fin-row${o.status === 'abgelehnt' ? ' ended' : ''}" data-act="offer-edit" data-id="${esc(o.id)}"><span class="t">${esc(o.firm || 'Angebot')}${min !== null && o.amount === min && o.status !== 'abgelehnt' ? ' <span class="tag">günstigstes</span>' : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${expired ? 'late' : o.status}">${expired ? 'abgelaufen' : o.status}</span><span class="amt">${eur.format(o.amount)}</span></button>`;
+        return `<button class="fin-row${o.status === 'abgelehnt' ? ' ended' : ''}" data-act="offer-edit" data-id="${esc(o.id)}"><span class="t">${esc(o.firm || 'Angebot')}${min !== null && o.amount === min && o.status !== 'abgelehnt' ? ' <span class="tag">günstigstes</span>' : ''}${(o.files || []).length ? ` <span class="tag">${o.files.length} ${o.files.length === 1 ? 'Datei' : 'Dateien'}</span>` : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${expired ? 'late' : o.status}">${expired ? 'abgelaufen' : o.status}</span><span class="amt">${eur.format(o.amount)}</span></button>`;
       }).join('')}</div></section>`;
     }).join('') : '<section class="panel"><p class="empty">Noch keine Angebote. Trag sie mit Gewerk ein, dann werden Angebote für dasselbe Gewerk nebeneinander verglichen.</p></section>';
   }
+  if (ui.h10Tab === 'dateien') h += renderFilesTab();
   $('#h10Body').innerHTML = h;
 }
 
@@ -2246,11 +2369,15 @@ function editInvoice(id, offerId) {
       const paid = !!v.paid;
       const rec = { firm: v.firm.trim(), trade: v.trade.trim(), title: v.title.trim(), number: v.number.trim(), amount, date: v.date || '', due: v.due || '',
                     paid, paidDate: paid ? (v.paidDate || todayStr()) : '', offerId: v.offerId || '', url: v.url.trim(), note: (v.note || '').trim() };
+      rec.files = att.files;
+      att.commitChanges();
       if (i) Object.assign(i, rec); else data.h10.invoices.push({ id: uid(), ...rec });
       commit();
     },
-    onDelete: i ? () => { data.h10.invoices = data.h10.invoices.filter(x => x !== i); commit(); } : null
+    onDelete: i ? () => { att.rollback(); att.trashAll(); data.h10.invoices = data.h10.invoices.filter(x => x !== i); commit(); } : null,
+    onClose: () => att.rollback()
   });
+  const att = attachUI(i, 'inv', () => [$('#dlgBody [name=firm]').value, $('#dlgBody [name=number]').value || $('#dlgBody [name=title]').value].filter(Boolean).join(' ') || 'Rechnung');
   const pd = $('#dlgBody [name=paidDate]'), pc = $('#dlgBody [name=paid]');
   const sync = () => { pd.closest('.field').style.visibility = pc.checked ? '' : 'hidden'; if (pc.checked && !pd.value) pd.value = todayStr(); };
   pc.addEventListener('change', sync); sync();
@@ -2277,11 +2404,15 @@ function editOffer(id, trade) {
       if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben.'); return false; }
       const rec = { firm: v.firm.trim(), trade: v.trade.trim(), title: v.title.trim(), amount, status: v.status, date: v.date || '', validUntil: v.validUntil || '',
                     url: v.url.trim(), note: (v.note || '').trim() };
+      rec.files = att.files;
+      att.commitChanges();
       if (o) Object.assign(o, rec); else data.h10.offers.push({ id: uid(), ...rec });
       commit();
     },
-    onDelete: o ? () => { data.h10.invoices.forEach(i => { if (i.offerId === o.id) i.offerId = ''; }); data.h10.offers = data.h10.offers.filter(x => x !== o); commit(); } : null
+    onDelete: o ? () => { att.rollback(); att.trashAll(); data.h10.invoices.forEach(i => { if (i.offerId === o.id) i.offerId = ''; }); data.h10.offers = data.h10.offers.filter(x => x !== o); commit(); } : null,
+    onClose: () => att.rollback()
   });
+  const att = attachUI(o, 'offer', () => [$('#dlgBody [name=firm]').value, $('#dlgBody [name=title]').value].filter(Boolean).join(' ') || 'Angebot');
   if (o && o.status === 'angenommen') {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn small'; b.textContent = 'Rechnung zu diesem Angebot erfassen';
@@ -2299,6 +2430,226 @@ function addLinkButton(url) {
   $('#dlgBody').appendChild(b);
 }
 
+/* ---------- Dateien in Google Drive ---------- */
+const H10_PATH = { files: ['Hausbau H10', 'Dateien'], inv: ['Hausbau H10', 'Rechnungen'], offer: ['Hausbau H10', 'Angebote'] };
+async function driveSubfolder(path) {
+  meta.driveFolders = meta.driveFolders || {};
+  let parent = await driveFolder();
+  const acc = [];
+  for (const name of path) {
+    acc.push(name);
+    const k = acc.join('/');
+    if (meta.driveFolders[k]) { parent = meta.driveFolders[k]; continue; }
+    const q = encodeURIComponent(`name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parent}' in parents and trashed=false`);
+    const j = await (await api(`${DRIVE_API}/files?q=${q}&fields=files(id)&spaces=drive`)).json();
+    let id = j.files && j.files[0] && j.files[0].id;
+    if (!id) id = (await (await api(`${DRIVE_API}/files?fields=id`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [parent] }) })).json()).id;
+    meta.driveFolders[k] = id; parent = id;
+  }
+  saveMeta();
+  return parent;
+}
+async function driveUploadFile(file, path, name, retry) {
+  try {
+    const parent = await driveSubfolder(path);
+    const type = file.type || 'application/octet-stream';
+    const init = await api(`${UPLOAD_API}/files?uploadType=resumable&fields=id,name,mimeType,size,thumbnailLink,webViewLink`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type },
+      body: JSON.stringify({ name, parents: [parent], mimeType: type }) });
+    const loc = init.headers.get('Location');
+    if (!loc) throw new Error('Google Drive hat keine Upload-Adresse geliefert.');
+    const r = await fetch(loc, { method: 'PUT', headers: { 'Content-Type': type }, body: file });
+    if (!r.ok) throw Object.assign(new Error('Hochladen fehlgeschlagen (' + r.status + ')'), { status: r.status });
+    return r.json();
+  } catch (e) {
+    if (!retry && e.status === 404) { meta.driveFolders = {}; meta.folderId = null; saveMeta(); return driveUploadFile(file, path, name, true); }  // Ordner wurde in Drive gelöscht
+    throw e;
+  }
+}
+async function driveTrash(id) {
+  try { await api(`${DRIVE_API}/files/${id}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) }); }
+  catch (e) { if (e instanceof AuthError) throw e; }
+}
+const safeName = v => (v || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+const isImg = f => /^image\//.test(f.mime || '');
+const isPdf = f => /pdf/.test(f.mime || '') || /\.pdf$/i.test(f.name || '');
+const fileInfo = new Map();        // Drive-ID → { thumb, view }
+const localPreview = new Map();    // Drive-ID → Objekt-URL direkt nach dem Hochladen
+const blobCache = new Map();
+let thumbsAt = 0, thumbsBusy = false;
+async function loadThumbs(force) {
+  if (!signedIn() || thumbsBusy || (!force && Date.now() - thumbsAt < 20 * 60 * 1000) || !data.h10.files.length) return;
+  thumbsBusy = true;
+  try {
+    const parent = await driveSubfolder(H10_PATH.files);
+    let token = '';
+    do {
+      const q = encodeURIComponent(`'${parent}' in parents and trashed=false`);
+      const j = await (await api(`${DRIVE_API}/files?q=${q}&pageSize=1000&fields=nextPageToken,files(id,thumbnailLink,webViewLink)${token ? '&pageToken=' + token : ''}`)).json();
+      (j.files || []).forEach(f => fileInfo.set(f.id, { thumb: f.thumbnailLink ? f.thumbnailLink.replace(/=s\d+$/, '=s480') : '', view: f.webViewLink || '' }));
+      token = j.nextPageToken || '';
+    } while (token);
+    thumbsAt = Date.now();
+    if (ui.view === 'h10' && ui.h10Tab === 'dateien') renderH10();
+  } catch (e) { if (!(e instanceof AuthError)) console.warn(e); }
+  finally { thumbsBusy = false; }
+}
+async function fileBlobUrl(id) {
+  if (blobCache.has(id)) return blobCache.get(id);
+  const r = await api(`${DRIVE_API}/files/${id}?alt=media`);
+  const url = URL.createObjectURL(await r.blob());
+  blobCache.set(id, url);
+  return url;
+}
+const driveViewUrl = id => (fileInfo.get(id) || {}).view || `https://drive.google.com/file/d/${id}/view`;
+const isMobile = () => /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+/* Großansicht für Fotos und PDFs */
+const viewer = $('#viewer');
+let viewerList = [], viewerIdx = 0, viewerEdit = null;
+function openViewer(list, idx, onEdit) {
+  viewerList = list; viewerIdx = idx; viewerEdit = onEdit || null;
+  if (!viewer.open) viewer.showModal();
+  showViewerItem();
+}
+async function showViewerItem() {
+  const f = viewerList[viewerIdx];
+  if (!f) return;
+  $('#viewerTitle').textContent = f.title || f.name;
+  $('#viewerPrev').hidden = $('#viewerNext').hidden = viewerList.length < 2;
+  $('#viewerEdit').hidden = !viewerEdit;
+  const body = $('#viewerBody');
+  if (!signedIn()) { body.innerHTML = '<p class="empty">Zum Anzeigen bitte zuerst mit Google verbinden.</p>'; return; }
+  if (isPdf(f) && isMobile()) {
+    const th = (fileInfo.get(f.id) || {}).thumb;
+    body.innerHTML = `<div class="viewer-pdf">${th ? `<img src="${esc(th)}" alt="">` : '<div class="file-icon big">PDF</div>'}<p>PDFs öffnet dein Handy am besten in Google Drive.</p><button class="btn primary" type="button" data-act="viewer-drive">In Google Drive öffnen</button></div>`;
+    return;
+  }
+  if (!isImg(f) && !isPdf(f)) { body.innerHTML = `<div class="viewer-pdf"><div class="file-icon big">Datei</div><button class="btn primary" type="button" data-act="viewer-drive">In Google Drive öffnen</button></div>`; return; }
+  body.innerHTML = '<p class="empty">Lädt …</p>';
+  try {
+    const url = await fileBlobUrl(f.id);
+    if (viewerList[viewerIdx] !== f) return;
+    body.innerHTML = isImg(f) ? `<img class="viewer-img" src="${url}" alt="${esc(f.title || f.name)}">` : `<iframe class="viewer-frame" src="${url}" title="${esc(f.title || f.name)}"></iframe>`;
+  } catch (e) {
+    body.innerHTML = `<p class="empty">Konnte nicht geladen werden: ${esc(friendly(e))}</p><div class="row"><button class="btn" type="button" data-act="viewer-drive">In Google Drive öffnen</button></div>`;
+  }
+}
+$('#viewerClose').addEventListener('click', () => viewer.close());
+$('#viewerPrev').addEventListener('click', () => { viewerIdx = (viewerIdx - 1 + viewerList.length) % viewerList.length; showViewerItem(); });
+$('#viewerNext').addEventListener('click', () => { viewerIdx = (viewerIdx + 1) % viewerList.length; showViewerItem(); });
+$('#viewerDrive').addEventListener('click', () => { const f = viewerList[viewerIdx]; if (f) window.open(driveViewUrl(f.id), '_blank', 'noopener'); });
+$('#viewerEdit').addEventListener('click', () => { const f = viewerList[viewerIdx]; if (f && viewerEdit) { viewer.close(); viewerEdit(f); } });
+viewer.addEventListener('keydown', e => { if (e.key === 'ArrowRight') $('#viewerNext').click(); if (e.key === 'ArrowLeft') $('#viewerPrev').click(); });
+
+/* Register „Dateien“ */
+const guessFileCat = (name, mime) => /plan|grundriss|ansicht|schnitt|lageplan|statik/i.test(name) ? 'Pläne' : /^image\//.test(mime) ? 'Fotos' : /pdf/.test(mime) ? 'Dokumente' : 'Sonstiges';
+async function uploadH10Files(list) {
+  if (!signedIn()) { toast('Zum Hochladen bitte zuerst mit Google verbinden.'); return; }
+  let n = 0;
+  for (const file of list) {
+    n++;
+    toast(`Lädt hoch ${n} von ${list.length}: ${file.name}`);
+    try {
+      const r = await driveUploadFile(file, H10_PATH.files, safeName(file.name) || 'Datei');
+      const rec = { id: r.id, name: file.name, title: file.name.replace(/\.[^.]+$/, ''), mime: file.type || r.mimeType || '', size: file.size,
+                    cat: guessFileCat(file.name, file.type || ''), created: new Date().toISOString(), note: '' };
+      if (/^image\//.test(rec.mime)) localPreview.set(r.id, URL.createObjectURL(file));
+      if (r.thumbnailLink) fileInfo.set(r.id, { thumb: r.thumbnailLink.replace(/=s\d+$/, '=s480'), view: r.webViewLink || '' });
+      data.h10.files.unshift(rec);
+      commit();
+    } catch (e) { toast(`„${file.name}“ konnte nicht hochgeladen werden: ${friendly(e)}`); return; }
+  }
+  toast(list.length === 1 ? 'Datei gespeichert' : `${list.length} Dateien gespeichert`);
+  setTimeout(() => loadThumbs(true), 8000);              // Drive braucht kurz für die Vorschaubilder
+}
+function editH10File(f) {
+  openDialog({
+    title: 'Datei bearbeiten',
+    fields: [
+      { name: 'title', label: 'Titel', value: f.title || f.name, required: true },
+      { name: 'cat', label: 'Kategorie', type: 'select', value: f.cat, options: ['Pläne', 'Fotos', 'Dokumente', 'Sonstiges'].map(c => ({ value: c, label: c })) },
+      { name: 'note', label: 'Notiz', type: 'textarea', value: f.note }],
+    onSave: v => { Object.assign(f, { title: v.title.trim(), cat: v.cat, note: (v.note || '').trim() }); commit(); },
+    onDelete: async () => {
+      data.h10.files = data.h10.files.filter(x => x !== f); commit();
+      try { await driveTrash(f.id); toast('Datei in den Papierkorb von Google Drive verschoben'); } catch (e) { toast('In Google Drive konnte die Datei nicht gelöscht werden.'); }
+    }
+  });
+  const info = document.createElement('p');
+  info.className = 'muted'; info.style.gridColumn = '1 / -1'; info.style.margin = '-4px 0 12px';
+  info.textContent = `${f.name}${f.size ? ', ' + (f.size / 1048576).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' MB' : ''}, hochgeladen am ${fmtD((f.created || '').slice(0, 10))}. Löschen verschiebt die Datei in Google Drive in den Papierkorb.`;
+  $('#dlgBody').appendChild(info);
+}
+function renderFilesTab() {
+  const F = data.h10.files, cat = ui.h10FileCat;
+  const cats = ['Alle', 'Pläne', 'Fotos', 'Dokumente', 'Sonstiges'];
+  const list = F.filter(f => cat === 'Alle' || f.cat === cat);
+  if (F.length && signedIn()) loadThumbs(false);
+  let h = `<div class="fin-toolbar"><div class="row" style="margin:0"><button class="btn small primary" data-act="h10-upload">Dateien hinzufügen</button></div>
+    <div class="seg">${cats.map(c => `<button type="button" data-act="h10-fcat" data-c="${c}" aria-pressed="${c === cat}">${c}${c !== 'Alle' ? ` (${F.filter(f => f.cat === c).length})` : ''}</button>`).join('')}</div></div>`;
+  if (!signedIn()) h += '<p class="muted">Vorschau und Hochladen funktionieren, sobald du mit Google verbunden bist.</p>';
+  h += list.length ? `<div class="file-grid">${list.map(f => {
+    const th = localPreview.get(f.id) || (fileInfo.get(f.id) || {}).thumb;
+    return `<button class="file-card" data-act="h10-file" data-id="${esc(f.id)}"><span class="file-thumb">${th ? `<img src="${esc(th)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span class="file-icon">${isPdf(f) ? 'PDF' : isImg(f) ? 'Foto' : 'Datei'}</span></span>
+      <span class="file-name">${esc(f.title || f.name)}</span><span class="file-meta">${esc(f.cat)}, ${esc(fmtD((f.created || '').slice(0, 10)))}</span></button>`;
+  }).join('')}</div>` : `<section class="panel"><p class="empty">${F.length ? 'Keine Dateien in dieser Kategorie.' : 'Noch keine Dateien. Füge Pläne, Fotos oder PDFs hinzu. Sie werden in deinem Google Drive im Ordner „Dashboard / Hausbau H10 / Dateien“ gespeichert.'}</p></section>`;
+  return h;
+}
+
+/* Anhänge bei Rechnungen und Angeboten: werden sofort hochgeladen, beim Abbrechen wieder entfernt */
+function attachUI(rec, kind, nameBase) {
+  const files = rec && rec.files ? rec.files.map(f => ({ ...f })) : [];
+  const added = [], removed = [];
+  const box = document.createElement('div');
+  box.className = 'field att';
+  box.style.gridColumn = '1 / -1';
+  const draw = () => {
+    box.innerHTML = `<label>Dateien</label><div class="att-list">${files.length ? files.map((f, i) => `<span class="att-item"><button type="button" class="link att-open" data-i="${i}">${esc(f.name)}</button><button type="button" class="btn small danger att-del" data-i="${i}" aria-label="${esc(f.name)} entfernen">Entfernen</button></span>`).join('') : '<span class="muted">Noch keine Dateien angehängt.</span>'}</div>
+      <div class="row" style="margin:6px 0 0"><button type="button" class="btn small att-add">Foto oder PDF anhängen</button></div>`;
+  };
+  draw();
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*,application/pdf'; input.multiple = true; input.hidden = true;
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.classList.contains('att-add')) { if (!signedIn()) { toast('Zum Anhängen bitte zuerst mit Google verbinden.'); return; } input.click(); }
+    if (b.classList.contains('att-open')) openViewer(files, +b.dataset.i);
+    if (b.classList.contains('att-del')) {
+      const f = files[+b.dataset.i];
+      if (!confirm(`„${f.name}“ entfernen? Die Datei wird beim Speichern in Google Drive in den Papierkorb verschoben.`)) return;
+      files.splice(+b.dataset.i, 1);
+      const ai = added.findIndex(x => x.id === f.id);
+      if (ai >= 0) { added.splice(ai, 1); driveTrash(f.id); } else removed.push(f);
+      draw();
+    }
+  });
+  input.addEventListener('change', async () => {
+    const list = [...input.files]; input.value = '';
+    for (const file of list) {
+      toast(`Lädt hoch: ${file.name}`);
+      try {
+        const r = await driveUploadFile(file, H10_PATH[kind], safeName(`${nameBase()} - ${file.name}`));
+        const f = { id: r.id, name: file.name, mime: file.type || r.mimeType || '' };
+        files.push(f); added.push(f);
+        if (r.webViewLink) fileInfo.set(r.id, { thumb: '', view: r.webViewLink });
+        draw();
+      } catch (e) { toast(`„${file.name}“ konnte nicht hochgeladen werden: ${friendly(e)}`); }
+    }
+    if (list.length) toast('Angehängt. Zum Übernehmen bitte speichern.');
+  });
+  box.appendChild(input);
+  const body = $('#dlgBody'), note = $('#dlgBody [name=note]');
+  body.insertBefore(box, note ? note.closest('.field') : null);
+  return {
+    files,
+    commitChanges: () => { removed.forEach(f => driveTrash(f.id)); },
+    rollback: () => { added.forEach(f => driveTrash(f.id)); },
+    trashAll: () => { files.forEach(f => driveTrash(f.id)); }
+  };
+}
+
 /* ---------- Dialog ---------- */
 const dlg = $('#dlg');
 let dlgState = null;
@@ -2311,8 +2662,9 @@ function fieldHtml(f) {
   else input = `<input id="${id}" name="${f.name}" type="${f.type || 'text'}" value="${esc(f.value)}"${f.required ? ' required' : ''}${f.list ? ` list="${f.list}"` : ''}${f.inputmode ? ` inputmode="${f.inputmode}"` : ''}>`;
   return `<div class="field${f.half ? ' half' : ''}"><label for="${id}">${esc(f.label)}</label>${input}${f.hint ? `<span class="sub">${esc(f.hint)}</span>` : ''}</div>`;
 }
-function openDialog({ title, fields, onSave, onDelete }) {
-  dlgState = { onSave, onDelete };
+function openDialog({ title, fields, onSave, onDelete, onClose }) {
+  if (dlg.open) { const old = dlgState; dlg.close(); if (old && !old.saved && old.onClose) { old.onClose(); old.onClose = null; } }
+  dlgState = { onSave, onDelete, onClose, saved: false };
   $('#dlgTitle').textContent = title;
   $('#dlgBody').innerHTML = fields.map(fieldHtml).join('');
   $('#dlgDelete').hidden = !onDelete;
@@ -2322,10 +2674,13 @@ $('#dlgForm').addEventListener('submit', e => {
   e.preventDefault();
   const vals = Object.fromEntries(new FormData(e.target));
   if (dlgState && dlgState.onSave(vals) === false) return;
+  if (dlgState) dlgState.saved = true;
   dlg.close();
 });
+dlg.addEventListener('close', () => setTimeout(applyPendingLocal, 50));
+dlg.addEventListener('close', () => { if (dlg.open) return; const st = dlgState; if (st && !st.saved && st.onClose) { st.onClose(); st.onClose = null; } });
 $('#dlgCancel').addEventListener('click', () => dlg.close());
-$('#dlgDelete').addEventListener('click', () => { if (dlgState && dlgState.onDelete && confirm('Wirklich löschen?')) { dlgState.onDelete(); dlg.close(); } });
+$('#dlgDelete').addEventListener('click', () => { if (dlgState && dlgState.onDelete && confirm('Wirklich löschen?')) { dlgState.saved = true; dlgState.onDelete(); dlg.close(); } });
 
 function editTodo(id) {
   const t = data.todos.find(x => x.id === id); if (!t) return;
@@ -3130,6 +3485,14 @@ document.addEventListener('click', async e => {
     case 'fold': { const open = foldOpen(d.k); meta.fold[d.k] = !open; saveMeta(); renderFolds(); break; }
     case 'h10-tab': ui.h10Detail = null; ui.h10Tab = d.tab; meta.h10Tab = d.tab; saveMeta(); renderH10(); break;
     case 'h10-inv': ui.h10Inv = d.f; renderH10(); break;
+    case 'h10-upload': if (!signedIn()) { toast('Zum Hochladen bitte zuerst mit Google verbinden.'); break; } $('#h10FileInput').click(); break;
+    case 'h10-fcat': ui.h10FileCat = d.c; renderH10(); break;
+    case 'h10-file': {
+      const list = data.h10.files.filter(f => ui.h10FileCat === 'Alle' || f.cat === ui.h10FileCat);
+      openViewer(list, list.findIndex(f => f.id === d.id), f => editH10File(f));
+      break;
+    }
+    case 'viewer-drive': { const f = viewerList[viewerIdx]; if (f) window.open(driveViewUrl(f.id), '_blank', 'noopener'); break; }
     case 'loan-new': editLoan(null); break;
     case 'loan-edit': editLoan(d.id); break;
     case 'loan-open': ui.h10Detail = { kind: 'loan', id: d.id }; ui.h10Year = ''; renderH10(); window.scrollTo(0, 0); break;
@@ -3245,6 +3608,11 @@ document.addEventListener('change', e => {
   }
 });
 
+$('#h10FileInput').addEventListener('change', e => {
+  const list = [...(e.target.files || [])];
+  e.target.value = '';
+  if (list.length) uploadH10Files(list);
+});
 $('#xlsInput').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0];
   if (f) onXlsFile(f);
@@ -3304,6 +3672,7 @@ $('#finForm').addEventListener('submit', e => {
 /* Beim Zurückkehren zur App: neuesten Stand holen */
 let lastCheck = 0;
 function onReturn() {
+  if ($('#dlg').open) return;
   renderHome(); renderStatus();
   if (Date.now() - lastCheck < 5000) return;
   lastCheck = Date.now();
