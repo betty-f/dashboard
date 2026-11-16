@@ -462,6 +462,24 @@ body.dragging .file-card{cursor:grabbing}
 .h10-sum .avail{grid-column:auto}
 @media (max-width:900px){ .h10-sum{grid-template-columns:repeat(2,minmax(0,1fr))} .h10-sum .avail{grid-column:auto} }
 
+/* Teilzahlungen und Termine im Angebotsdialog */
+.rowed-list{display:flex;flex-direction:column;gap:6px}
+.rowed-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.rowed-row input,.rowed-row select{width:auto;flex:1 1 120px;padding:6px 8px;font-size:14px}
+.rowed-row input[type=date]{flex:0 1 150px}
+.rowed-row .chk{flex:none;font-size:13.5px !important}
+.rowed-info{margin-top:6px;font-size:13px}
+.rowed-info .neg{color:var(--danger)}
+/* Hausbau-Termine im Kalender */
+.offer-row.appt{gap:10px;padding-right:2px}
+.offer-row.appt .fin-row{cursor:default}
+.offer-row.appt.past .t{color:var(--muted)}
+.offer-row.appt .btn{flex:none}
+#h10ApptPanel .panel-head{flex-wrap:wrap}
+#apptFilter{max-width:100%;overflow-x:auto}
+@media (max-width:640px){ .offer-row.appt{flex-wrap:wrap;padding-bottom:8px} .offer-row.appt .fin-row{flex:1 1 100%} .offer-row.appt .btn{margin-left:74px} }
+dialog:has(.rowed){width:min(640px,calc(100vw - 32px))}
+
 </style>
 </head>
 <body>
@@ -536,6 +554,16 @@ body.dragging .file-card{cursor:grabbing}
         <section class="panel day-panel">
           <div class="panel-head"><h2 id="dayTitle"></h2><div class="row" style="margin:0"><button class="btn small" data-act="gcal-open">In Google Kalender öffnen</button><button class="btn small primary" data-act="event-new">Termin hinzufügen</button></div></div>
           <div id="dayList"></div>
+        </section>
+        <section class="panel" id="h10ApptPanel" style="margin-top:16px" hidden>
+          <div class="panel-head"><h2>Termine aus dem Hausbau</h2>
+            <div class="seg" id="apptFilter">
+              <button type="button" data-act="appt-filter" data-f="offen">Noch nicht im Kalender</button>
+              <button type="button" data-act="appt-filter" data-f="drin">Im Kalender</button>
+              <button type="button" data-act="appt-filter" data-f="alle">Alle</button>
+            </div>
+          </div>
+          <div id="h10ApptList" class="fin-list"></div>
         </section>
       </section>
 
@@ -857,7 +885,9 @@ function normalize(d) {
       payAcc: x.payAcc || '' })),
     offers: arr(h.offers).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', date: x.date || '', amount: Number(x.amount) || 0,
       validUntil: x.validUntil || '', status: ['angefordert', 'offen', 'angenommen', 'abgelehnt'].includes(x.status) ? x.status : 'offen', url: x.url || '', note: x.note || '', files: attList(x.files),
-      prio: !!x.prio })),
+      prio: !!x.prio,
+      installments: arr(x.installments).map(r => ({ id: r.id, label: r.label || '', amount: Number(r.amount) || 0, due: r.due || '', paid: !!r.paid, paidDate: r.paidDate || '', inCal: !!r.inCal })),
+      appts: arr(x.appts).map(r => ({ id: r.id, type: r.type || 'Lieferung', date: r.date || '', time: r.time || '', note: r.note || '', inCal: !!r.inCal })) })),
     accountIds: Array.isArray(h.accountIds) ? h.accountIds.filter(id => accounts.some(a => a.id === id)) : null,
     files: arr(h.files).map(x => ({ id: x.id, name: x.name || 'Datei', title: x.title || '', mime: x.mime || '', size: Number(x.size) || 0,
       cat: ['Pläne', 'Fotos', 'Dokumente', 'Sonstiges'].includes(x.cat) ? x.cat : 'Sonstiges', created: x.created || '', note: x.note || '' }))
@@ -879,7 +909,7 @@ let meta = lsGet(LS_META, {});           // view, fileId, folderId, baseRemote, 
 const saveLocal = () => lsSet(LS_DATA, data);
 const saveMeta = () => lsSet(LS_META, meta);
 
-const ui = { h10FileCat: 'Alle', h10Detail: null, h10Year: '', fbOpen: false, h10Tab: meta.h10Tab || 'kredite', h10Inv: 'alle', ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
+const ui = { apptFilter: 'offen', h10FileCat: 'Alle', h10Detail: null, h10Year: '', fbOpen: false, h10Tab: meta.h10Tab || 'kredite', h10Inv: 'alle', ff: { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }, ffOpen: false, finTab: 'buchungen', fixRange: 'month', view: meta.view || 'home', todoFilter: 'offen', finAccount: 'all', calMonth: todayStr().slice(0, 7), calDay: todayStr(),
              finMonth: todayStr().slice(0, 7), finType: 'ausgabe' };
 
 /* Jede Änderung: lokal speichern, als „noch nicht hochgeladen“ markieren, kurz danach mit Drive abgleichen */
@@ -1479,6 +1509,7 @@ function renderCal() {
   if (evs.length) dl += `<ul class="mini">${evs.map(e => entryRow(e, e.time ? esc(e.time) + (e.endTime ? '–' + esc(e.endTime) : '') : 'ganztägig')).join('')}</ul>`;
   if (tds.length) dl += `<h3 class="group-label">Aufgaben</h3><ul class="todos">${tds.map(todoItem).join('')}</ul>`;
   $('#dayList').innerHTML = dl || '<p class="empty">Nichts geplant.</p>';
+  renderH10Appts();
 }
 
 const inAcc = f => ui.finAccount === 'all' || f.accountId === ui.finAccount;
@@ -1875,11 +1906,84 @@ function h10Accounts() {
 }
 const openOnAcc = id => data.h10.invoices.filter(i => !i.paid && i.payAcc === id).reduce((x, i) => x + i.amount, 0);
 /* Kostenplanung je Gewerk: angenommene Angebote, sonst das priorisierte (auch angeforderte mit Schätzwert); Rechnungen zählen mindestens */
+/* Teilzahlungen und bezahlte Rechnungen eines Angebots: es zählt der höhere Betrag, damit nichts doppelt gerechnet wird */
+const instPaid = o => (o.installments || []).filter(r => r.paid).reduce((x, r) => x + r.amount, 0);
+const invPaidFor = o => data.h10.invoices.filter(i => i.offerId === o.id && i.paid).reduce((x, i) => x + i.amount, 0);
+const offerPaid = o => Math.max(instPaid(o), invPaidFor(o));
+const APPT_TYPES = ['Lieferung', 'Beginn Arbeiten', 'Fertigstellung', 'Abnahme', 'Sonstiges'];
+/* Alle Termine aus angenommenen Angeboten plus fällige Teilzahlungen */
+function h10Appts() {
+  const out = [];
+  for (const o of data.h10.offers) {
+    if (o.status === 'angenommen') for (const a of o.appts || []) if (a.date) out.push({ kind: 'appt', o, item: a, date: a.date, time: a.time, label: a.type, note: a.note, inCal: a.inCal });
+    for (const r of o.installments || []) if (r.due && !r.paid) out.push({ kind: 'inst', o, item: r, date: r.due, time: '', label: 'Teilzahlung fällig', note: `${r.label || 'Teilzahlung'}: ${eur.format(r.amount)}`, inCal: r.inCal });
+  }
+  return out.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+}
+function setInCal(mark, on) {
+  const o = data.h10.offers.find(x => x.id === mark.o);
+  const list = o && (mark.kind === 'inst' ? o.installments : o.appts);
+  const it = list && list.find(x => x.id === mark.id);
+  if (it) it.inCal = on;
+}
+function renderH10Appts() {
+  const all = h10Appts(), panel = $('#h10ApptPanel');
+  panel.hidden = !all.length;
+  if (!all.length) return;
+  const f = ui.apptFilter;
+  $$('#apptFilter button').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === f));
+  const list = all.filter(x => f === 'alle' || (f === 'drin' ? x.inCal : !x.inCal));
+  const t = todayStr();
+  $('#h10ApptList').innerHTML = list.length ? list.map(x => {
+    const title = `${x.label}: ${x.o.firm || 'Angebot'}${x.o.trade ? ' (' + x.o.trade + ')' : ''}`;
+    return `<div class="offer-row appt${x.date < t ? ' past' : ''}"><span class="fin-row static"><span class="d">${esc(fmtD(x.date))}${x.time ? '<br>' + esc(x.time) : ''}</span>
+      <span class="t">${esc(title)}<span class="c">${esc([x.o.title, x.note].filter(Boolean).join(', '))}</span></span>${x.inCal ? '<span class="state st-angenommen">im Kalender</span>' : ''}</span>
+      ${x.inCal ? `<button type="button" class="btn small" data-act="appt-unmark" data-o="${esc(x.o.id)}" data-id="${esc(x.item.id)}" data-kind="${x.kind}">Markierung entfernen</button>`
+               : `<button type="button" class="btn small primary" data-act="appt-add" data-o="${esc(x.o.id)}" data-id="${esc(x.item.id)}" data-kind="${x.kind}">In Kalender eintragen</button>`}</div>`;
+  }).join('') : `<p class="empty">${f === 'offen' ? 'Alle Termine sind schon im Kalender.' : f === 'drin' ? 'Noch keine Termine im Kalender eingetragen.' : 'Keine Termine.'}</p>`;
+}
+
+/* Bearbeitbare Liste im Dialog (Teilzahlungen, Termine) */
+function rowEditor({ title, rows, cols, addLabel, empty, before }) {
+  const list = rows.map(r => ({ ...r }));
+  const box = document.createElement('div');
+  box.className = 'field rowed';
+  box.style.gridColumn = '1 / -1';
+  const draw = () => {
+    box.innerHTML = `<label>${esc(title)}</label>${list.length ? `<div class="rowed-list">${list.map((r, i) => `<div class="rowed-row">${cols.map(c => {
+      const v = r[c.key];
+      if (c.type === 'select') return `<select data-i="${i}" data-k="${c.key}" aria-label="${esc(c.label)}">${c.options.map(o => `<option${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+      if (c.type === 'checkbox') return `<label class="chk"><input type="checkbox" data-i="${i}" data-k="${c.key}"${v ? ' checked' : ''}> ${esc(c.label)}</label>`;
+      return `<input type="${c.type || 'text'}" data-i="${i}" data-k="${c.key}" value="${esc(c.fmt ? c.fmt(v) : v || '')}" placeholder="${esc(c.label)}" aria-label="${esc(c.label)}"${c.inputmode ? ` inputmode="${c.inputmode}"` : ''}${c.width ? ` style="width:${c.width}"` : ''}>`;
+    }).join('')}<button type="button" class="btn small danger" data-del="${i}" aria-label="Zeile entfernen">✕</button></div>`).join('')}</div>` : `<p class="muted" style="margin:0">${esc(empty)}</p>`}
+      <div class="row" style="margin:6px 0 0"><button type="button" class="btn small" data-add="1">${esc(addLabel)}</button></div><div class="rowed-info muted"></div>`;
+  };
+  draw();
+  box.addEventListener('input', e => {
+    const i = e.target.dataset.i, k = e.target.dataset.k;
+    if (i === undefined) return;
+    const c = cols.find(x => x.key === k);
+    list[+i][k] = e.target.type === 'checkbox' ? e.target.checked : c && c.parse ? c.parse(e.target.value) : e.target.value;
+    if (api.onChange) api.onChange();
+  });
+  box.addEventListener('change', e => { if (e.target.type === 'checkbox' || e.target.tagName === 'SELECT') box.dispatchEvent(new Event('input', { bubbles: false })); });
+  box.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.add) { list.push(Object.fromEntries([['id', uid()], ...cols.map(c => [c.key, c.def !== undefined ? (typeof c.def === 'function' ? c.def(list) : c.def) : ''])])); draw(); if (api.onChange) api.onChange(); }
+    if (b.dataset.del !== undefined) { list.splice(+b.dataset.del, 1); draw(); if (api.onChange) api.onChange(); }
+  });
+  const body = $('#dlgBody'), anchor = before ? $('#dlgBody ' + before) : null;
+  body.insertBefore(box, anchor ? anchor.closest('.field') : null);
+  const api = { list, box, info: html => { $('.rowed-info', box).innerHTML = html; }, onChange: null };
+  return api;
+}
+
 function costPlan() {
   const H = data.h10, tr = {};
   const T = k => (tr[k || 'Ohne Gewerk'] = tr[k || 'Ohne Gewerk'] || { offers: [], inv: 0, paid: 0 });
-  H.offers.forEach(o => T(o.trade).offers.push(o));
-  H.invoices.forEach(i => { const x = T(i.trade); x.inv += i.amount; if (i.paid) x.paid += i.amount; });
+  H.offers.forEach(o => { const x = T(o.trade); x.offers.push(o); x.paid += offerPaid(o); });
+  H.invoices.forEach(i => { const x = T(i.trade); x.inv += i.amount; if (i.paid && !(i.offerId && offerFor(i.offerId))) x.paid += i.amount; });
   const rows = Object.entries(tr).map(([name, x]) => {
     const acc = x.offers.filter(o => o.status === 'angenommen');
     const pr = x.offers.find(o => o.prio && o.status !== 'abgelehnt' && o.status !== 'angenommen');
@@ -2178,8 +2282,14 @@ function renderH10() {
         const inv = data.h10.invoices.filter(i => i.offerId === o.id).reduce((x, i) => x + i.amount, 0);
         const expired = o.status === 'offen' && o.validUntil && o.validUntil < t;
         const req = o.status === 'angefordert';
-        const sub = [o.title, o.date ? (req ? 'angefordert am ' : 'vom ') + fmtD(o.date) : '', !req && o.validUntil ? (expired ? 'abgelaufen am ' : 'gültig bis ') + fmtD(o.validUntil) : '',
-                     inv ? 'abgerechnet ' + eur.format(inv) : ''].filter(Boolean).join(', ');
+        const ins = o.installments || [], paid = offerPaid(o);
+        const nextAppt = o.status === 'angenommen' ? (o.appts || []).filter(a => a.date >= t).sort((a, b) => a.date.localeCompare(b.date))[0] : null;
+        const nextInst = ins.filter(r => !r.paid && r.due).sort((a, b) => a.due.localeCompare(b.due))[0];
+        const sub = [o.title, o.date ? (req ? 'angefordert am ' : 'vom ') + fmtD(o.date) : '', !req && o.status !== 'angenommen' && o.validUntil ? (expired ? 'abgelaufen am ' : 'gültig bis ') + fmtD(o.validUntil) : '',
+                     inv ? 'abgerechnet ' + eur.format(inv) : '',
+                     ins.length ? `Teilzahlungen ${ins.filter(r => r.paid).length} von ${ins.length} bezahlt, Rest ${eur.format(Math.max(0, o.amount - paid))}` : paid ? `bezahlt ${eur.format(paid)}, Rest ${eur.format(Math.max(0, o.amount - paid))}` : '',
+                     nextInst ? `nächste Rate ${fmtD(nextInst.due)}` : '',
+                     nextAppt ? `${nextAppt.type} ${fmtD(nextAppt.date)}` : ''].filter(Boolean).join(', ');
         const canPrio = o.status !== 'abgelehnt' && o.status !== 'angenommen';
         return `<div class="offer-row${o.prio ? ' prio' : ''}"><button class="fin-row${o.status === 'abgelehnt' ? ' ended' : ''}" data-act="offer-edit" data-id="${esc(o.id)}"><span class="t">${esc(o.firm || 'Angebot')}${min !== null && o.amount === min && !req && o.status !== 'abgelehnt' ? ' <span class="tag">günstigstes</span>' : ''}${o.prio ? ' <span class="tag prio">priorisiert</span>' : ''}${(o.files || []).length ? ` <span class="tag">${o.files.length} ${o.files.length === 1 ? 'Datei' : 'Dateien'}</span>` : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${expired ? 'late' : o.status}">${expired ? 'abgelaufen' : o.status}</span><span class="amt">${req ? (o.amount ? '≈ ' + eur.format(o.amount) : 'kein Schätzwert') : eur.format(o.amount)}</span></button>
           ${canPrio ? `<button type="button" class="star${o.prio ? ' on' : ''}" data-act="offer-prio" data-id="${esc(o.id)}" aria-pressed="${o.prio}" title="${o.prio ? 'Priorisierung aufheben' : 'Für die Kostenplanung priorisieren'}" aria-label="${o.prio ? 'Priorisierung aufheben' : 'Priorisieren'}">${o.prio ? '★' : '☆'}</button>` : '<span class="star-gap"></span>'}</div>`;
@@ -2489,7 +2599,10 @@ function editOffer(id, trade, status) {
       const raw = parseAmount(v.amount), amount = isFinite(raw) ? raw : 0;
       if (v.status !== 'angefordert' && !(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben. Bei angeforderten Angeboten reicht ein Schätzwert oder nichts.'); return false; }
       const rec = { firm: v.firm.trim(), trade: v.trade.trim(), title: v.title.trim(), amount, status: v.status, date: v.date || '', validUntil: v.validUntil || '',
-                    url: v.url.trim(), note: (v.note || '').trim(), prio: !!v.prio && v.status !== 'abgelehnt' };
+                    url: v.url.trim(), note: (v.note || '').trim(), prio: !!v.prio && v.status !== 'abgelehnt',
+                    installments: instEd.list.filter(r => r.amount > 0 || r.label).map(r => ({ ...r, paidDate: r.paid ? (r.paidDate || todayStr()) : '' })),
+                    appts: apptEd.list.filter(r => r.date) };
+      if (rec.installments.some(r => r.paid && !(r.amount > 0))) { toast('Bitte bei bezahlten Teilzahlungen einen Betrag angeben.'); return false; }
       if (rec.prio) data.h10.offers.forEach(x => { if (x !== o && (x.trade || '') === rec.trade) x.prio = false; });   // ein priorisiertes Angebot je Gewerk
       rec.files = att.files;
       att.commitChanges();
@@ -2500,9 +2613,37 @@ function editOffer(id, trade, status) {
     onClose: () => att.rollback()
   });
   const att = attachUI(o, 'offer', () => [$('#dlgBody [name=firm]').value, $('#dlgBody [name=title]').value].filter(Boolean).join(' ') || 'Angebot');
-  { // Beschriftungen passend zum Status
-    const st = $('#dlgBody [name=status]'), lab = $('#dlgBody label[for=f_amount]'), dl = $('#dlgBody label[for=f_date]');
-    const upd = () => { const req = st.value === 'angefordert'; lab.textContent = req ? 'Schätzwert in € (optional)' : 'Betrag (brutto) in €'; dl.textContent = req ? 'Angefordert am' : 'Angebot vom'; };
+  const instEd = rowEditor({
+    title: 'Teilzahlungen', rows: o ? (o.installments || []) : [], addLabel: 'Teilzahlung hinzufügen', before: '[name=url]',
+    empty: 'Keine Teilzahlungen. Bei Abschlagszahlungen hier die einzelnen Raten eintragen, dann wird der Restbetrag angerechnet.',
+    cols: [{ key: 'label', label: 'Bezeichnung', def: l => `${l.length + 1}. Rate` },
+           { key: 'amount', label: 'Betrag €', inputmode: 'decimal', width: '110px', fmt: v => v ? num2(v) : '', parse: v => { const n = parseAmount(v); return isFinite(n) ? n : 0; }, def: 0 },
+           { key: 'due', label: 'fällig am', type: 'date' },
+           { key: 'paid', label: 'bezahlt', type: 'checkbox', def: false }]
+  });
+  const apptEd = rowEditor({
+    title: 'Termine (Lieferung, Beginn der Arbeiten …)', rows: o ? (o.appts || []) : [], addLabel: 'Termin hinzufügen', before: '[name=url]',
+    empty: 'Noch keine Termine. Sie erscheinen im Kalender unter „Termine aus dem Hausbau“ und lassen sich dort in deinen Kalender eintragen.',
+    cols: [{ key: 'type', label: 'Art', type: 'select', options: APPT_TYPES, def: 'Lieferung' },
+           { key: 'date', label: 'Datum', type: 'date' },
+           { key: 'time', label: 'Uhrzeit', type: 'time', width: '100px' },
+           { key: 'note', label: 'Notiz' }]
+  });
+  { // Beschriftungen und Bereiche passend zum Status
+    const st = $('#dlgBody [name=status]'), lab = $('#dlgBody label[for=f_amount]'), dl = $('#dlgBody label[for=f_date]'), amt = $('#dlgBody [name=amount]');
+    const sums = () => {
+      const tot = parseAmount(amt.value) || 0, sp = instEd.list.reduce((x, r) => x + (r.amount || 0), 0), pd = instEd.list.filter(r => r.paid).reduce((x, r) => x + (r.amount || 0), 0);
+      instEd.info(instEd.list.length ? `Geplant ${eur.format(sp)} von ${eur.format(tot)}${Math.abs(sp - tot) > 0.005 && tot ? ` <b class="${sp > tot ? 'neg' : ''}">(${sp > tot ? 'mehr' : 'weniger'} als das Angebot: ${eur.format(Math.abs(sp - tot))})</b>` : ''}, bezahlt ${eur.format(pd)}, <b>Rest ${eur.format(Math.max(0, tot - pd))}</b>` : '');
+    };
+    const upd = () => {
+      const req = st.value === 'angefordert';
+      lab.textContent = req ? 'Schätzwert in € (optional)' : 'Betrag (brutto) in €';
+      dl.textContent = req ? 'Angefordert am' : 'Angebot vom';
+      apptEd.box.hidden = st.value !== 'angenommen';
+      instEd.box.hidden = req || st.value === 'abgelehnt';
+      sums();
+    };
+    instEd.onChange = sums; amt.addEventListener('input', sums);
     st.addEventListener('change', upd); upd();
   }
   if (o && o.status === 'angenommen') {
@@ -2865,25 +3006,26 @@ function editTodo(id) {
   });
 }
 function plusHour(t) { const [h, m] = t.split(':').map(Number); return h >= 23 ? '23:59' : `${pad(h + 1)}:${pad(m)}`; }
-function editEvent(id, date) {
+function editEvent(id, date, pre, onDone) {
   const ev = id ? data.events.find(x => x.id === id) : null;
   if (id && !ev) return;
   const targets = data.settings.gcals.filter(writable);
   const options = [{ value: 'dashboard', label: 'Dashboard (nur in dieser App)' }, ...targets.map(c => ({ value: c.id, label: 'Google: ' + c.name }))];
   const lastTarget = options.some(o => o.value === meta.lastTarget) ? meta.lastTarget : 'dashboard';
-  const fields = [{ name: 'text', label: 'Titel', value: ev && ev.title, required: true }];
+  pre = pre || {};
+  const fields = [{ name: 'text', label: 'Titel', value: ev ? ev.title : pre.title, required: true }];
   if (targets.length) fields.push({ name: 'target', label: 'Eintragen in', type: 'select', value: ev ? 'dashboard' : lastTarget, options });
-  const startDate = (ev && ev.date) || date || todayStr();
+  const startDate = (ev && ev.date) || pre.date || date || todayStr();
   const nextHour = `${pad(Math.min(new Date().getHours() + 1, 23))}:00`;
-  const startTime = ev ? (ev.time || nextHour) : nextHour;
-  fields.push({ name: 'allday', label: 'Ganztägig', type: 'checkbox', value: ev ? !ev.time : false },
+  const startTime = ev ? (ev.time || nextHour) : (pre.time || nextHour);
+  fields.push({ name: 'allday', label: 'Ganztägig', type: 'checkbox', value: ev ? !ev.time : pre.title ? !pre.time : false },
               { name: 'date', label: 'Beginn', type: 'date', value: startDate, required: true, half: true },
               { name: 'time', label: 'Uhrzeit', type: 'time', value: startTime, half: true },
               { name: 'endDate', label: 'Ende', type: 'date', value: (ev && ev.endDate) || startDate, required: true, half: true },
               { name: 'end', label: 'Uhrzeit', type: 'time', value: ev ? (ev.end || plusHour(startTime)) : plusHour(startTime), half: true },
-              { name: 'note', label: 'Notiz', type: 'textarea', value: ev && ev.note });
+              { name: 'note', label: 'Notiz', type: 'textarea', value: ev ? ev.note : pre.note });
   openDialog({
-    title: ev ? 'Termin bearbeiten' : 'Neuer Termin',
+    title: ev ? 'Termin bearbeiten' : pre.title ? 'In den Kalender eintragen' : 'Neuer Termin',
     fields,
     onSave: v => {
       const allDay = !!v.allday;
@@ -2898,10 +3040,11 @@ function editEvent(id, date) {
       if (!ev) { meta.lastTarget = target; saveMeta(); }
       ui.calDay = rec.date; ui.calMonth = rec.date.slice(0, 7);
       if (target !== 'dashboard') {
-        createGoogleEvent(target, rec).then(ok => { if (ok && ev) { data.events = data.events.filter(x => x !== ev); commit(); } });
+        createGoogleEvent(target, rec, pre.mark).then(ok => { if (ok && ev) { data.events = data.events.filter(x => x !== ev); commit(); } if (ok && onDone) onDone(); });
         return;
       }
       if (ev) Object.assign(ev, rec); else data.events.push({ id: uid(), created: new Date().toISOString(), ...rec });
+      if (onDone) onDone();
       commit();
     },
     onDelete: ev ? () => { data.events = data.events.filter(x => x !== ev); commit(); } : null
@@ -2931,12 +3074,12 @@ function editEvent(id, date) {
   syncAllDay();
 }
 /* Termin in einen Google-Kalender schreiben. Gibt true zurück, wenn es geklappt hat. */
-async function createGoogleEvent(calId, rec) {
+async function createGoogleEvent(calId, rec, mark) {
   const c = data.settings.gcals.find(x => x.id === calId);
   if (!signedIn() || !canWrite()) {
     const why = signedIn() ? 'Damit das Dashboard Termine in Google eintragen darf, musst du einmal neu verbinden und den Kalenderzugriff erlauben.' : 'Die Google-Verbindung ist abgelaufen.';
     if (confirm(why + ' Jetzt verbinden? Der Termin wird danach automatisch eingetragen.')) {
-      lsSet('dashboard.pendingEvent', { calId, rec });
+      lsSet('dashboard.pendingEvent', { calId, rec, mark: mark || null });
       signIn();
     }
     return false;
@@ -2969,7 +3112,7 @@ async function runPendingEvent() {
   const p = lsGet('dashboard.pendingEvent', null);
   if (!p || !signedIn()) return;
   localStorage.removeItem('dashboard.pendingEvent');
-  if (canWrite()) await createGoogleEvent(p.calId, p.rec);
+  if (canWrite()) { if (await createGoogleEvent(p.calId, p.rec) && p.mark) { setInCal(p.mark, true); commit(); } }
   else toast('Der Termin konnte nicht eingetragen werden, weil der Kalenderzugriff nicht erlaubt wurde.');
 }
 function addCategory(c) { c = (c || '').trim(); if (c && !data.settings.categories.includes(c)) data.settings.categories.push(c); }
@@ -3708,6 +3851,16 @@ document.addEventListener('click', async e => {
     case 'inv-edit': editInvoice(d.id); break;
     case 'offer-new': editOffer(null, d.trade || ''); break;
     case 'offer-req': editOffer(null, '', 'angefordert'); break;
+    case 'appt-filter': ui.apptFilter = d.f; renderH10Appts(); break;
+    case 'appt-unmark': setInCal({ o: d.o, id: d.id, kind: d.kind }, false); commit(); break;
+    case 'appt-add': {
+      const x = h10Appts().find(a => a.o.id === d.o && a.item.id === d.id && a.kind === d.kind);
+      if (!x) break;
+      const mark = { o: d.o, id: d.id, kind: d.kind };
+      editEvent(null, x.date, { title: `${x.label}: ${x.o.firm || 'Angebot'}${x.o.trade ? ' (' + x.o.trade + ')' : ''}`, date: x.date, time: x.time,
+        note: [x.o.title, x.note].filter(Boolean).join('\n'), mark }, () => { setInCal(mark, true); commit(); toast('Eingetragen und in der Liste markiert'); });
+      break;
+    }
     case 'offer-prio': {
       const o = data.h10.offers.find(x => x.id === d.id); if (!o) break;
       const on = !o.prio;
