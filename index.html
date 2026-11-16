@@ -444,6 +444,24 @@ body.dragging .file-card{cursor:grabbing}
 .drag-hint{margin:-4px 0 12px}
 .fin-toolbar .seg{max-width:100%;overflow-x:auto}
 
+/* Angebote: angefordert, priorisiert, Kostenplanung */
+.st-angefordert{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.st-prio{background:color-mix(in srgb,var(--event) 18%,transparent);color:var(--event)}
+.tag.prio{background:color-mix(in srgb,var(--event) 18%,transparent);color:var(--event)}
+.offer-row{display:flex;align-items:center;gap:6px;border-top:1px solid var(--line)}
+.fin-list > .offer-row:first-child{border-top:0}
+.offer-row .fin-row{border-top:0;flex:1;min-width:0}
+.offer-row.prio .fin-row .t{font-weight:600}
+.star{flex:none;width:38px;height:38px;border:1px solid var(--line);border-radius:50%;background:var(--surface);font-size:19px;line-height:1;cursor:pointer;color:var(--muted)}
+.star:hover{border-color:var(--event);color:var(--event)}
+.star.on{background:color-mix(in srgb,var(--event) 16%,var(--surface));border-color:var(--event);color:var(--event)}
+.star-gap{flex:none;width:38px}
+.tbl tr.sum td{border-top:2px solid var(--line);border-bottom:0}
+.stat .link{padding:0;margin-top:4px;font-size:12.5px}
+.h10-sum{grid-template-columns:repeat(3,minmax(0,1fr))}
+.h10-sum .avail{grid-column:auto}
+@media (max-width:900px){ .h10-sum{grid-template-columns:repeat(2,minmax(0,1fr))} .h10-sum .avail{grid-column:auto} }
+
 </style>
 </head>
 <body>
@@ -790,7 +808,7 @@ function parseAmount(s) {
 /* ---------- Daten ---------- */
 function emptyData() {
   return { app: 'dashboard', version: 2, updatedAt: null, todos: [], events: [], finance: [],
-           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [], h10: { loans: [], invoices: [], offers: [], bausparer: [], files: [] },
+           accounts: [{ id: 'konto-1', name: 'Hauptkonto', url: '', iban: '', startBalance: 0, startDate: '', balSource: '' }], fixed: [], h10: { loans: [], invoices: [], offers: [], bausparer: [], files: [], accountIds: null },
            settings: { gcals: [], showOwn: true, showTodos: true, ownColor: '#3B5BA5', todoColor: '#7A8290', categories: [...DEFAULT_CATS],
                        catRules: { ...DEFAULT_RULES }, fixedIgnore: [] } };
 }
@@ -835,9 +853,12 @@ function normalize(d) {
       replacesLoanId: x.replacesLoanId || '', anchorAmount: x.anchorAmount === '' || x.anchorAmount == null ? '' : Number(x.anchorAmount) || 0, anchorDate: x.anchorDate || '',
       url: x.url || '', note: x.note || '' })),
     invoices: arr(h.invoices).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', number: x.number || '', date: x.date || '',
-      amount: Number(x.amount) || 0, due: x.due || '', paid: !!x.paid, paidDate: x.paidDate || '', offerId: x.offerId || '', url: x.url || '', note: x.note || '', files: attList(x.files) })),
+      amount: Number(x.amount) || 0, due: x.due || '', paid: !!x.paid, paidDate: x.paidDate || '', offerId: x.offerId || '', url: x.url || '', note: x.note || '', files: attList(x.files),
+      payAcc: x.payAcc || '' })),
     offers: arr(h.offers).map(x => ({ id: x.id, firm: x.firm || '', title: x.title || '', trade: x.trade || '', date: x.date || '', amount: Number(x.amount) || 0,
-      validUntil: x.validUntil || '', status: ['offen', 'angenommen', 'abgelehnt'].includes(x.status) ? x.status : 'offen', url: x.url || '', note: x.note || '', files: attList(x.files) })),
+      validUntil: x.validUntil || '', status: ['angefordert', 'offen', 'angenommen', 'abgelehnt'].includes(x.status) ? x.status : 'offen', url: x.url || '', note: x.note || '', files: attList(x.files),
+      prio: !!x.prio })),
+    accountIds: Array.isArray(h.accountIds) ? h.accountIds.filter(id => accounts.some(a => a.id === id)) : null,
     files: arr(h.files).map(x => ({ id: x.id, name: x.name || 'Datei', title: x.title || '', mime: x.mime || '', size: Number(x.size) || 0,
       cat: ['Pläne', 'Fotos', 'Dokumente', 'Sonstiges'].includes(x.cat) ? x.cat : 'Sonstiges', created: x.created || '', note: x.note || '' }))
   };
@@ -1846,6 +1867,59 @@ const fmtYm = ym => `${ym.slice(5, 7)}.${ym.slice(0, 4)}`;
 const yearsMonths = m => { const y = Math.floor(m / 12), r = m % 12; return [y ? `${y} ${y === 1 ? 'Jahr' : 'Jahren'}` : '', r ? `${r} ${r === 1 ? 'Monat' : 'Monaten'}` : ''].filter(Boolean).join(' und '); };
 const invState = i => i.paid ? 'bezahlt' : i.due && i.due < todayStr() ? 'überfällig' : 'offen';
 const offerFor = id => data.h10.offers.find(o => o.id === id);
+/* Konten, die für den Hausbau angezeigt werden: ausgewählt, sonst alles mit „Tagesgeld“ im Namen */
+function h10Accounts() {
+  const ids = data.h10.accountIds;
+  if (Array.isArray(ids)) return data.accounts.filter(a => ids.includes(a.id));
+  return data.accounts.filter(a => /tagesgeld/i.test(a.name));
+}
+const openOnAcc = id => data.h10.invoices.filter(i => !i.paid && i.payAcc === id).reduce((x, i) => x + i.amount, 0);
+/* Kostenplanung je Gewerk: angenommene Angebote, sonst das priorisierte (auch angeforderte mit Schätzwert); Rechnungen zählen mindestens */
+function costPlan() {
+  const H = data.h10, tr = {};
+  const T = k => (tr[k || 'Ohne Gewerk'] = tr[k || 'Ohne Gewerk'] || { offers: [], inv: 0, paid: 0 });
+  H.offers.forEach(o => T(o.trade).offers.push(o));
+  H.invoices.forEach(i => { const x = T(i.trade); x.inv += i.amount; if (i.paid) x.paid += i.amount; });
+  const rows = Object.entries(tr).map(([name, x]) => {
+    const acc = x.offers.filter(o => o.status === 'angenommen');
+    const pr = x.offers.find(o => o.prio && o.status !== 'abgelehnt' && o.status !== 'angenommen');
+    let basis = 0, src = '', firm = '';
+    if (acc.length) { basis = acc.reduce((v, o) => v + o.amount, 0); src = 'angenommen'; firm = acc.map(o => o.firm).join(', '); }
+    else if (pr) { basis = pr.amount; src = pr.status === 'angefordert' ? 'Schätzung' : 'priorisiert'; firm = pr.firm; }
+    const plan = Math.max(basis, x.inv);
+    return { name, basis, src, firm, inv: x.inv, paid: x.paid, plan, open: Math.max(0, plan - x.paid), n: x.offers.length,
+             undecided: !src && x.offers.some(o => o.status !== 'abgelehnt') };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const sum = k => rows.reduce((v, r) => v + r[k], 0);
+  return { rows, plan: sum('plan'), paid: sum('paid'), open: sum('open'),
+           bySrc: src => rows.filter(r => r.src === src).reduce((v, r) => v + r.basis, 0) };
+}
+function costPlanTable(foldKey) {
+  const cp = costPlan();
+  meta.fold = meta.fold || {};
+  const open = meta.fold[foldKey] !== false;
+  const srcTag = r => r.src ? `<span class="state st-${r.src === 'angenommen' ? 'angenommen' : r.src === 'Schätzung' ? 'angefordert' : 'prio'}">${r.src}</span>` : r.undecided ? '<span class="state">nicht ausgewählt</span>' : '';
+  return `<section class="panel fold${open ? '' : ' closed'}" data-fold="${foldKey}"><div class="fold-head"><button type="button" class="fold-btn" data-act="fold" data-k="${foldKey}" aria-expanded="${open}"><span class="chev" aria-hidden="true"></span>Kostenplanung nach Gewerk</button><span class="muted">geplant ${eur.format(cp.plan)}, offen ${eur.format(cp.open)}</span></div>
+    <div class="fold-body">${cp.rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Gewerk</th><th>Grundlage</th><th class="r">Angebot</th><th class="r">Rechnungen</th><th class="r">Bezahlt</th><th class="r">Geplant</th><th class="r">Noch offen</th></tr></thead><tbody>
+    ${cp.rows.map(r => { const over = r.basis && r.inv > r.basis + 0.005;
+      return `<tr><td>${esc(r.name)}</td><td>${srcTag(r)}${r.firm ? ' <span class="muted">' + esc(r.firm) + '</span>' : ''}</td><td class="r">${r.basis ? eur.format(r.basis) : '–'}</td>
+        <td class="r${over ? ' neg' : ''}">${r.inv ? eur.format(r.inv) : '–'}</td><td class="r">${r.paid ? eur.format(r.paid) : '–'}</td><td class="r"><b>${eur.format(r.plan)}</b></td><td class="r">${eur.format(r.open)}</td></tr>`; }).join('')}
+    <tr class="sum"><td colspan="5">Summe</td><td class="r"><b>${eur.format(cp.plan)}</b></td><td class="r"><b>${eur.format(cp.open)}</b></td></tr>
+    </tbody></table></div><p class="muted">Pro Gewerk zählt das angenommene Angebot, sonst das priorisierte Angebot (auch ein angefordertes mit Schätzwert). Liegen die Rechnungen höher, zählen die Rechnungen; rot heißt teurer als geplant. Gewerke mit „nicht ausgewählt“ fließen noch nicht ein: Markiere dort ein Angebot mit dem Stern.</p>`
+      : '<p class="empty">Noch keine Angebote oder Rechnungen.</p>'}</div></section>`;
+}
+function chooseH10Accounts() {
+  const cur = new Set(h10Accounts().map(a => a.id));
+  openDialog({
+    title: 'Konten für den Hausbau',
+    fields: data.accounts.map(a => ({ name: 'a_' + a.id, label: `${a.name} (${eur.format(accBalance(a))})`, type: 'checkbox', value: cur.has(a.id) })),
+    onSave: v => { data.h10.accountIds = data.accounts.filter(a => v['a_' + a.id]).map(a => a.id); commit(); }
+  });
+  const p = document.createElement('p');
+  p.className = 'muted'; p.style.gridColumn = '1 / -1'; p.style.margin = '0 0 12px';
+  p.textContent = 'Die gewählten Konten erscheinen oben im Hausbau mit ihrem Stand aus den Finanzen, abzüglich der offenen Rechnungen, die von diesem Konto bezahlt werden sollen.';
+  $('#dlgBody').prepend(p);
+}
 
 /* ---- Excel einlesen (SheetJS wird erst bei Bedarf geladen) ---- */
 function loadXlsx() {
@@ -2059,12 +2133,16 @@ function renderH10() {
   const invSum = H.invoices.reduce((x, i) => x + i.amount, 0);
   const paidSum = H.invoices.filter(i => i.paid).reduce((x, i) => x + i.amount, 0);
   const late = H.invoices.filter(i => invState(i) === 'überfällig').length;
+  const cp = costPlan(), accs = h10Accounts();
+  const accSum = accs.reduce((x, a) => x + accBalance(a), 0);
+  const fund = availSum + accSum, gap = fund - cp.open;
   $('#h10Sum').innerHTML = `
     <div class="stat avail"><span>Kredite noch verfügbar</span><b>${eur.format(availSum)}</b><small>${loanSum ? `abgerufen ${eur.format(drawnSum)} von ${eur.format(loanSum)}` : 'noch keine Kredite'}${availParts.length ? '<br>' + availParts.map(l => `${esc(l.name || l.bank || 'Kredit')}: ${eur.format(availableAt(l, t))}`).join('<br>') : ''}</small></div>
-    <div class="stat"><span>Kredite gesamt</span><b>${eur.format(loanSum)}</b><small>Restschuld heute ${eur.format(restSum)}</small></div>
-    <div class="stat"><span>Angebote angenommen</span><b>${eur.format(accepted)}</b><small>${H.offers.filter(o => o.status === 'offen').length} noch offen</small></div>
-    <div class="stat"><span>Rechnungen gesamt</span><b>${eur.format(invSum)}</b><small>davon bezahlt ${eur.format(paidSum)}</small></div>
-    <div class="stat ${late ? 'out' : ''}"><span>Noch zu zahlen</span><b>${eur.format(invSum - paidSum)}</b><small>${late ? `${late} ${late === 1 ? 'Rechnung' : 'Rechnungen'} überfällig` : 'nichts überfällig'}</small></div>`;
+    <div class="stat"><span>${accs.length === 1 ? esc(accs[0].name) : 'Konten Hausbau'}</span><b>${eur.format(accSum)}</b><small>${accs.length ? accs.map(a => { const o = openOnAcc(a.id); return `${accs.length > 1 ? esc(a.name) + ': ' + eur.format(accBalance(a)) + (o ? ', ' : '') : ''}${o ? `nach offenen Rechnungen ${eur.format(accBalance(a) - o)}` : ''}`; }).filter(Boolean).join('<br>') || 'Stand aus den Finanzen' : 'noch kein Konto gewählt'}</small><button class="link" data-act="h10-accs">Konten wählen</button></div>
+    <div class="stat"><span>Geplante Kosten</span><b>${eur.format(cp.plan)}</b><small>${[cp.bySrc('angenommen') ? 'angenommen ' + eur.format(cp.bySrc('angenommen')) : '', cp.bySrc('priorisiert') ? 'priorisiert ' + eur.format(cp.bySrc('priorisiert')) : '', cp.bySrc('Schätzung') ? 'geschätzt ' + eur.format(cp.bySrc('Schätzung')) : ''].filter(Boolean).join('<br>') || 'Angebote annehmen oder priorisieren'}</small></div>
+    <div class="stat ${late ? 'out' : ''}"><span>Noch zu zahlen</span><b>${eur.format(cp.open)}</b><small>bezahlt ${eur.format(cp.paid)}${invSum - paidSum ? `<br>davon in Rechnung ${eur.format(invSum - paidSum)}` : ''}${late ? `<br>${late} ${late === 1 ? 'Rechnung' : 'Rechnungen'} überfällig` : ''}</small></div>
+    <div class="stat ${gap < -0.005 ? 'out' : 'in'}"><span>${gap < -0.005 ? 'Finanzierungslücke' : 'Finanzierung gedeckt'}</span><b>${eur.format(Math.abs(gap))}</b><small>verfügbar ${eur.format(fund)} (Kredite ${eur.format(availSum)}${accs.length ? ', Konten ' + eur.format(accSum) : ''}) gegen noch zu zahlen ${eur.format(cp.open)}</small></div>
+    <div class="stat"><span>Kredite gesamt</span><b>${eur.format(loanSum)}</b><small>Restschuld heute ${eur.format(restSum)}</small></div>`;
 
   let h = '';
   if (ui.h10Tab === 'kredite') h += ui.h10Detail ? renderLoanDetail() : renderLoanList();
@@ -2075,42 +2153,38 @@ function renderH10() {
       .sort((a, b) => (a.paid - b.paid) || (b.date || '').localeCompare(a.date || ''));
     h += `<div class="fin-toolbar"><div class="row" style="margin:0"><button class="btn small primary" data-act="inv-new">Rechnung hinzufügen</button></div>
       <div class="seg">${[['alle', 'Alle'], ['offen', 'Offen'], ['bezahlt', 'Bezahlt']].map(([k, l]) => `<button type="button" data-act="h10-inv" data-f="${k}" aria-pressed="${f === k}">${l}</button>`).join('')}</div></div>`;
-    // Kosten nach Gewerk: angenommenes Angebot gegen Rechnungen
-    const byTrade = {};
-    const add = (tr, k, v) => { tr = tr || 'Ohne Gewerk'; byTrade[tr] = byTrade[tr] || { offer: 0, inv: 0, paid: 0 }; byTrade[tr][k] += v; };
-    H.offers.filter(o => o.status === 'angenommen').forEach(o => add(o.trade, 'offer', o.amount));
-    H.invoices.forEach(i => { add(i.trade, 'inv', i.amount); if (i.paid) add(i.trade, 'paid', i.amount); });
-    const trs = Object.entries(byTrade).sort((a, b) => a[0].localeCompare(b[0], 'de'));
-    meta.fold = meta.fold || {};
-    h += `<section class="panel fold${meta.fold.trades === false ? ' closed' : ''}" data-fold="trades"><div class="fold-head"><button type="button" class="fold-btn" data-act="fold" data-k="trades" aria-expanded="${meta.fold.trades !== false}"><span class="chev" aria-hidden="true"></span>Kosten nach Gewerk</button></div>
-      <div class="fold-body">${trs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Gewerk</th><th class="r">Angebot</th><th class="r">Rechnungen</th><th class="r">Bezahlt</th><th class="r">Differenz</th></tr></thead><tbody>
-      ${trs.map(([tr, v]) => { const diff = v.offer ? v.inv - v.offer : 0; return `<tr><td>${esc(tr)}</td><td class="r">${v.offer ? eur.format(v.offer) : '–'}</td><td class="r">${eur.format(v.inv)}</td><td class="r">${eur.format(v.paid)}</td><td class="r ${diff > 0.005 ? 'neg' : ''}">${v.offer ? (diff > 0 ? '+' : '') + eur.format(diff) : '–'}</td></tr>`; }).join('')}
-      </tbody></table></div><p class="muted">Differenz = Rechnungen minus angenommenes Angebot. Rot heißt: teurer als angeboten.</p>` : '<p class="empty">Noch keine Daten.</p>'}</div></section>`;
+    h += costPlanTable('trades');
     h += `<section class="panel"><h2>Rechnungen</h2><div class="fin-list">${list.length ? list.map(i => {
       const st = invState(i), o = i.offerId ? offerFor(i.offerId) : null;
       const sub = [i.trade, i.number ? 'Nr. ' + i.number : '', i.date ? 'vom ' + fmtD(i.date) : '',
-                   i.paid ? (i.paidDate ? 'bezahlt am ' + fmtD(i.paidDate) : 'bezahlt') : i.due ? 'fällig ' + fmtD(i.due) : '', o ? 'zu Angebot ' + (o.firm || o.title) : ''].filter(Boolean).join(', ');
+                   i.paid ? (i.paidDate ? 'bezahlt am ' + fmtD(i.paidDate) : 'bezahlt') : i.due ? 'fällig ' + fmtD(i.due) : '', i.payAcc ? (i.paid ? 'von ' : 'über ') + accName(i.payAcc) : '',
+                   o ? 'zu Angebot ' + (o.firm || o.title) : ''].filter(Boolean).join(', ');
       return `<button class="fin-row" data-act="inv-edit" data-id="${esc(i.id)}"><span class="t">${esc(i.firm || 'Rechnung')}${i.title ? ' – ' + esc(i.title) : ''}${(i.files || []).length ? ` <span class="tag">${i.files.length} ${i.files.length === 1 ? 'Datei' : 'Dateien'}</span>` : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${st === 'überfällig' ? 'late' : st}">${st}</span><span class="amt">${eur.format(i.amount)}</span></button>`;
     }).join('') : '<p class="empty">Keine Rechnungen.</p>'}</div></section>`;
   }
 
   if (ui.h10Tab === 'angebote') {
-    h += '<div class="row" style="margin:0 0 16px"><button class="btn small primary" data-act="offer-new">Angebot hinzufügen</button></div>';
+    h += '<div class="row" style="margin:0 0 16px"><button class="btn small primary" data-act="offer-new">Angebot hinzufügen</button><button class="btn small" data-act="offer-req">Angebot anfordern</button></div>';
+    h += costPlanTable('plan');
     const groups = {};
     H.offers.forEach(o => { (groups[o.trade || 'Ohne Gewerk'] = groups[o.trade || 'Ohne Gewerk'] || []).push(o); });
     const keys = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'de'));
     h += keys.length ? keys.map(k => {
-      const list = groups[k].sort((a, b) => a.amount - b.amount);
-      const cmp = list.filter(o => o.status !== 'abgelehnt');
+      const rank = o => o.status === 'abgelehnt' ? 2 : o.status === 'angefordert' ? 1 : 0;
+      const list = groups[k].sort((a, b) => rank(a) - rank(b) || a.amount - b.amount);
+      const cmp = list.filter(o => o.status === 'offen' || o.status === 'angenommen');
       const min = cmp.length > 1 ? Math.min(...cmp.map(o => o.amount)) : null;
       return `<section class="panel offer-group"><div class="panel-head"><h2>${esc(k)}</h2><button class="btn small" data-act="offer-new" data-trade="${esc(k === 'Ohne Gewerk' ? '' : k)}">Weiteres Angebot</button></div><div class="fin-list">${list.map(o => {
         const inv = data.h10.invoices.filter(i => i.offerId === o.id).reduce((x, i) => x + i.amount, 0);
         const expired = o.status === 'offen' && o.validUntil && o.validUntil < t;
-        const sub = [o.title, o.date ? 'vom ' + fmtD(o.date) : '', o.validUntil ? (expired ? 'abgelaufen am ' : 'gültig bis ') + fmtD(o.validUntil) : '',
+        const req = o.status === 'angefordert';
+        const sub = [o.title, o.date ? (req ? 'angefordert am ' : 'vom ') + fmtD(o.date) : '', !req && o.validUntil ? (expired ? 'abgelaufen am ' : 'gültig bis ') + fmtD(o.validUntil) : '',
                      inv ? 'abgerechnet ' + eur.format(inv) : ''].filter(Boolean).join(', ');
-        return `<button class="fin-row${o.status === 'abgelehnt' ? ' ended' : ''}" data-act="offer-edit" data-id="${esc(o.id)}"><span class="t">${esc(o.firm || 'Angebot')}${min !== null && o.amount === min && o.status !== 'abgelehnt' ? ' <span class="tag">günstigstes</span>' : ''}${(o.files || []).length ? ` <span class="tag">${o.files.length} ${o.files.length === 1 ? 'Datei' : 'Dateien'}</span>` : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${expired ? 'late' : o.status}">${expired ? 'abgelaufen' : o.status}</span><span class="amt">${eur.format(o.amount)}</span></button>`;
+        const canPrio = o.status !== 'abgelehnt' && o.status !== 'angenommen';
+        return `<div class="offer-row${o.prio ? ' prio' : ''}"><button class="fin-row${o.status === 'abgelehnt' ? ' ended' : ''}" data-act="offer-edit" data-id="${esc(o.id)}"><span class="t">${esc(o.firm || 'Angebot')}${min !== null && o.amount === min && !req && o.status !== 'abgelehnt' ? ' <span class="tag">günstigstes</span>' : ''}${o.prio ? ' <span class="tag prio">priorisiert</span>' : ''}${(o.files || []).length ? ` <span class="tag">${o.files.length} ${o.files.length === 1 ? 'Datei' : 'Dateien'}</span>` : ''}<span class="c">${esc(sub)}</span></span><span class="state st-${expired ? 'late' : o.status}">${expired ? 'abgelaufen' : o.status}</span><span class="amt">${req ? (o.amount ? '≈ ' + eur.format(o.amount) : 'kein Schätzwert') : eur.format(o.amount)}</span></button>
+          ${canPrio ? `<button type="button" class="star${o.prio ? ' on' : ''}" data-act="offer-prio" data-id="${esc(o.id)}" aria-pressed="${o.prio}" title="${o.prio ? 'Priorisierung aufheben' : 'Für die Kostenplanung priorisieren'}" aria-label="${o.prio ? 'Priorisierung aufheben' : 'Priorisieren'}">${o.prio ? '★' : '☆'}</button>` : '<span class="star-gap"></span>'}</div>`;
       }).join('')}</div></section>`;
-    }).join('') : '<section class="panel"><p class="empty">Noch keine Angebote. Trag sie mit Gewerk ein, dann werden Angebote für dasselbe Gewerk nebeneinander verglichen.</p></section>';
+    }).join('') : '<section class="panel"><p class="empty">Noch keine Angebote. Trag sie mit Gewerk ein, dann werden Angebote für dasselbe Gewerk nebeneinander verglichen. Angebote, die du erst angefragt hast, legst du mit „Angebot anfordern“ an, gern mit einem Schätzwert.</p></section>';
   }
   if (ui.h10Tab === 'dateien') h += renderFilesTab();
   $('#h10Body').innerHTML = h;
@@ -2355,7 +2429,7 @@ function editInvoice(id, offerId) {
   const i = id ? data.h10.invoices.find(x => x.id === id) : null;
   if (id && !i) return;
   const o0 = offerId ? offerFor(offerId) : null;
-  const offers = data.h10.offers.filter(o => o.status === 'angenommen' || (i && i.offerId === o.id));
+  const offers = data.h10.offers.filter(o => o.status === 'angenommen' || o.prio || (i && i.offerId === o.id));
   openDialog({
     title: i ? 'Rechnung bearbeiten' : 'Neue Rechnung',
     fields: [
@@ -2368,6 +2442,8 @@ function editInvoice(id, offerId) {
       { name: 'due', label: 'Fällig am', type: 'date', value: i ? i.due : '', half: true },
       { name: 'paid', label: 'Bezahlt', type: 'checkbox', value: i ? i.paid : false },
       { name: 'paidDate', label: 'Bezahlt am', type: 'date', value: i ? i.paidDate : '', half: true },
+      { name: 'payAcc', label: 'Bezahlt von Konto', type: 'select', value: i ? i.payAcc : ((h10Accounts()[0] || {}).id || ''), half: true,
+        options: [{ value: '', label: 'nicht festgelegt' }, ...data.accounts.map(a => ({ value: a.id, label: a.name }))] },
       { name: 'offerId', label: 'Zum Angebot', type: 'select', value: i ? i.offerId : (offerId || ''), half: true,
         options: [{ value: '', label: 'Kein Angebot' }, ...offers.map(o => ({ value: o.id, label: `${o.firm || o.title} (${eur.format(o.amount)})` }))] },
       { name: 'url', label: 'Link zum Beleg (optional)', value: i ? i.url : '', inputmode: 'url' },
@@ -2377,7 +2453,7 @@ function editInvoice(id, offerId) {
       if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben.'); return false; }
       const paid = !!v.paid;
       const rec = { firm: v.firm.trim(), trade: v.trade.trim(), title: v.title.trim(), number: v.number.trim(), amount, date: v.date || '', due: v.due || '',
-                    paid, paidDate: paid ? (v.paidDate || todayStr()) : '', offerId: v.offerId || '', url: v.url.trim(), note: (v.note || '').trim() };
+                    paid, paidDate: paid ? (v.paidDate || todayStr()) : '', offerId: v.offerId || '', payAcc: v.payAcc || '', url: v.url.trim(), note: (v.note || '').trim() };
       rec.files = att.files;
       att.commitChanges();
       if (i) Object.assign(i, rec); else data.h10.invoices.push({ id: uid(), ...rec });
@@ -2392,27 +2468,29 @@ function editInvoice(id, offerId) {
   pc.addEventListener('change', sync); sync();
   if (i && i.url) addLinkButton(i.url);
 }
-function editOffer(id, trade) {
+function editOffer(id, trade, status) {
   const o = id ? data.h10.offers.find(x => x.id === id) : null;
   if (id && !o) return;
   openDialog({
-    title: o ? 'Angebot bearbeiten' : 'Neues Angebot',
+    title: o ? 'Angebot bearbeiten' : status === 'angefordert' ? 'Angebot anfordern' : 'Neues Angebot',
     fields: [
       { name: 'firm', label: 'Firma', value: o ? o.firm : '', required: true, list: 'firmList', half: true },
       { name: 'trade', label: 'Gewerk', value: o ? o.trade : trade, list: 'tradeList', half: true, hint: 'Angebote mit gleichem Gewerk werden verglichen.' },
       { name: 'title', label: 'Leistung', value: o ? o.title : '' },
-      { name: 'amount', label: 'Betrag (brutto) in €', value: o ? num2(o.amount) : '', required: true, inputmode: 'decimal', half: true },
-      { name: 'status', label: 'Status', type: 'select', value: o ? o.status : 'offen', half: true,
-        options: [{ value: 'offen', label: 'offen' }, { value: 'angenommen', label: 'angenommen' }, { value: 'abgelehnt', label: 'abgelehnt' }] },
+      { name: 'status', label: 'Status', type: 'select', value: o ? o.status : (status || 'offen'), half: true,
+        options: [{ value: 'angefordert', label: 'angefordert, noch nicht erhalten' }, { value: 'offen', label: 'erhalten, offen' }, { value: 'angenommen', label: 'angenommen' }, { value: 'abgelehnt', label: 'abgelehnt' }] },
+      { name: 'amount', label: 'Betrag (brutto) in €', value: o && o.amount ? num2(o.amount) : '', inputmode: 'decimal', half: true },
+      { name: 'prio', label: 'Priorisiert: in der Kostenplanung für dieses Gewerk berücksichtigen', type: 'checkbox', value: o ? o.prio : false },
       { name: 'date', label: 'Angebot vom', type: 'date', value: o ? o.date : todayStr(), half: true },
       { name: 'validUntil', label: 'Gültig bis', type: 'date', value: o ? o.validUntil : '', half: true },
       { name: 'url', label: 'Link zum Angebot (optional)', value: o ? o.url : '', inputmode: 'url' },
       { name: 'note', label: 'Notiz', type: 'textarea', value: o ? o.note : '' }],
     onSave: v => {
-      const amount = parseAmount(v.amount);
-      if (!(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben.'); return false; }
+      const raw = parseAmount(v.amount), amount = isFinite(raw) ? raw : 0;
+      if (v.status !== 'angefordert' && !(amount > 0)) { toast('Bitte einen Betrag größer als 0 eingeben. Bei angeforderten Angeboten reicht ein Schätzwert oder nichts.'); return false; }
       const rec = { firm: v.firm.trim(), trade: v.trade.trim(), title: v.title.trim(), amount, status: v.status, date: v.date || '', validUntil: v.validUntil || '',
-                    url: v.url.trim(), note: (v.note || '').trim() };
+                    url: v.url.trim(), note: (v.note || '').trim(), prio: !!v.prio && v.status !== 'abgelehnt' };
+      if (rec.prio) data.h10.offers.forEach(x => { if (x !== o && (x.trade || '') === rec.trade) x.prio = false; });   // ein priorisiertes Angebot je Gewerk
       rec.files = att.files;
       att.commitChanges();
       if (o) Object.assign(o, rec); else data.h10.offers.push({ id: uid(), ...rec });
@@ -2422,6 +2500,11 @@ function editOffer(id, trade) {
     onClose: () => att.rollback()
   });
   const att = attachUI(o, 'offer', () => [$('#dlgBody [name=firm]').value, $('#dlgBody [name=title]').value].filter(Boolean).join(' ') || 'Angebot');
+  { // Beschriftungen passend zum Status
+    const st = $('#dlgBody [name=status]'), lab = $('#dlgBody label[for=f_amount]'), dl = $('#dlgBody label[for=f_date]');
+    const upd = () => { const req = st.value === 'angefordert'; lab.textContent = req ? 'Schätzwert in € (optional)' : 'Betrag (brutto) in €'; dl.textContent = req ? 'Angefordert am' : 'Angebot vom'; };
+    st.addEventListener('change', upd); upd();
+  }
   if (o && o.status === 'angenommen') {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn small'; b.textContent = 'Rechnung zu diesem Angebot erfassen';
@@ -3624,6 +3707,17 @@ document.addEventListener('click', async e => {
     case 'inv-new': editInvoice(null, d.offer || ''); break;
     case 'inv-edit': editInvoice(d.id); break;
     case 'offer-new': editOffer(null, d.trade || ''); break;
+    case 'offer-req': editOffer(null, '', 'angefordert'); break;
+    case 'offer-prio': {
+      const o = data.h10.offers.find(x => x.id === d.id); if (!o) break;
+      const on = !o.prio;
+      data.h10.offers.forEach(x => { if ((x.trade || '') === (o.trade || '')) x.prio = false; });
+      o.prio = on;
+      commit();
+      toast(on ? `„${o.firm || 'Angebot'}“ fließt jetzt in die Kostenplanung für ${o.trade || 'dieses Gewerk'} ein` : 'Priorisierung aufgehoben');
+      break;
+    }
+    case 'h10-accs': chooseH10Accounts(); break;
     case 'offer-edit': editOffer(d.id); break;
     case 'open-url': if (d.url) window.open(d.url, '_blank', 'noopener'); break;
     case 'ff-reset': ui.ff = { cat: '', fixed: '', who: '', min: '', max: '', from: '', to: '' }; renderFin(); break;
